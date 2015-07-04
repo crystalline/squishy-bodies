@@ -1,4 +1,5 @@
 //Common 3d subroutines ported to JS from CL
+//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 //Initial slow implementation
 //TODO: Speed up
 //TODO: lower allocation overhead
@@ -24,6 +25,10 @@ function makeVec3(x,y,z) {
     return [x,y,z];
 }
 
+function zeroVec3(dst) {
+    dst[0] = 0; dst[1] = 0; dst[2] = 0;
+}
+
 function makeQuat(w,x,y,z) {
     return [w,x,y,z];
 }
@@ -41,6 +46,13 @@ function l2norm(v) {
         result += v[i]*v[i];
     }
     return Math.sqrt(result);
+}
+
+function distVec3(va, vb) {
+    var dx = va[0]-vb[0],
+        dy = va[1]-vb[1],
+        dz = va[2]-vb[2];
+    return Math.sqrt(dx*dx+dy*dy+dz*dz);
 }
 
 function matXvec(mat, vec, res) {
@@ -70,7 +82,7 @@ function normalize(vec, res) {
         invnorm = 0;
     else
         invnorm = 1/invnorm;
-    return sXv(invnorm, vec, res);
+    return scalXvec(invnorm, vec, res);
 }
 
 function addVecs(va, vb, res) {
