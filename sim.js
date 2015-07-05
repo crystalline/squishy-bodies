@@ -2,13 +2,28 @@
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 //Camera is isometric by default
-function makeCamera(position, topVec, rightVec) {
-    var rotation = false;
-    return {pos: position, rot: rotation};
+function makeCamera(position, alpha, beta) {
+    var camera = {pos: position};
+    
+    var refTop = [0,0,1];
+    var refRight = [0,1,0];
+    var rotTop = makeQuaternionRotation(refRight, -alpha);
+    var rotRight = makeQuaternionRotation(refTop, -beta);
+    
+    camera.top = applyQuaternionRotation(rotTop, refTop);
+    camera.right = applyQuaternionRotation(rotRight, refRight);
+    camera.forward = crossVecs(camera.top, camera.right);
+    
+    camera.rotation = mulQuats(rotTop, rotRight);
+    camera.rotmatrix = quaternionToRotMatrix(camera.rotation);
+    
+    return camera;
 }
 
 function applyCameraTransform(camera, vec, res) {
-    
+    res = res || makeVec3();
+    matXvec(camera.rotmatrix, vec, res);
+    return res;
 }
 
 //Point: {pos: [x,y,z], mass: point_mass}
@@ -22,7 +37,20 @@ function makeSoftBody(points, springs) {
     return {points: points, springs: springs};
 }
 	
-function addPointForces(point, world) {
+function computeSpringForces(spring) {
+    var pa = spring.pa;
+    var pb = spring.pb;
+    var diff = subVec(pb.pos, pa.pos);
+    var length = l2norm(diff);
+    var normal = scalXvec(1/length, diff);
+    var force = scalXvec(spring.k*(length-spring.d), normal);
+    
+    addVec(pa.force, force, pa.force);
+    var force = scalXvec(-1, force, force);
+    addVec(pb.force, force, pa.force);
+}
+
+function computePointForces(point, world) {
     var z = point.pos[2];
     
     if (z < 0) {
@@ -35,6 +63,8 @@ function addPointForces(point, world) {
     	    */
         }
         
+    } else {
+        point.ground = false;
     }
     
     point.force[2] -= world.g * point.m;
@@ -44,19 +74,6 @@ function integratePoint(point, dt) {
     addVec(point.v, scalXvec(dt/point.m, point.force), point.v);
     addVec(point.pos, scalXvec(dt, point.v), point.pos);
     zeroVec3(point.force);
-}
-
-function computeSpringForces(spring) {
-    var pa = spring.pa;
-    var pb = spring.pb;
-    var diff = subVec(pb.pos, pa.pos);
-    var length = l2norm(diff);
-    var normal = scalXvec(1/length, diff);
-    var force = scalXvec(spring.k*(length-spring.d), normal);
-    
-    addVec(pa.force, force, pa.force);
-    var force = scalXvec(-1, force, force);
-    addVec(pb.force, force, pa.force);
 }
 
 function makeSimWorld(settings) {
@@ -78,7 +95,7 @@ function makeSimWorld(settings) {
             }
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
-                addPointForces(pt, this);
+                computePointForces(pt, this);
                 integratePoint(pt);
             }
         });

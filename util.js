@@ -1,4 +1,5 @@
 //JS utility functions
+//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 util = {
     simpleExtend: function(dst, src) {

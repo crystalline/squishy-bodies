@@ -22,6 +22,7 @@ function makeArray(n, init) {
 }
 
 function makeVec3(x,y,z) {
+    x = x || 0; y = y || 0; z = z || 0; 
     return [x,y,z];
 }
 
@@ -113,7 +114,7 @@ function subVecs(va, vb, res) {
     return res;
 }
 
-function dotVecs(va, vb, res) {
+function dotVecs(va, vb) {
     var i, acc=0;
     for (i=0; i<va.length; i++) {
         acc += va[i] * vb[i];
