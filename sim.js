@@ -2,28 +2,49 @@
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 //Camera is isometric by default
-function makeCamera(position, alpha, beta) {
+function makeCamera(position, alpha, beta, screenW, screenH) {
     var camera = {pos: position};
     
-    var refTop = [0,0,1];
-    var refRight = [0,1,0];
-    var rotTop = makeQuaternionRotation(refRight, -alpha);
-    var rotRight = makeQuaternionRotation(refTop, -beta);
+    camera.refTop = [0,0,1];
+    camera.refRight = [0,1,0];
     
-    camera.top = applyQuaternionRotation(rotTop, refTop);
-    camera.right = applyQuaternionRotation(rotRight, refRight);
-    camera.forward = crossVecs(camera.top, camera.right);
+    camera.updateTransform = function (alpha, beta) {
+        camera.rotTop = makeQuaternionRotation(refRight, -alpha);
+        camera.rotRight = makeQuaternionRotation(refTop, -beta);
     
-    camera.rotation = mulQuats(rotTop, rotRight);
-    camera.rotmatrix = quaternionToRotMatrix(camera.rotation);
+        camera.top = applyQuaternionRotation(rotTop, refTop);
+        camera.right = applyQuaternionRotation(rotRight, refRight);
+        camera.forward = crossVecs(camera.top, camera.right);
+        
+        camera.rotation = mulQuats(rotTop, rotRight);
+        camera.matrix = quaternionToRotMatrix(camera.rotation);
+        
+        camera.screenMatrix = [Math.min(screenW, screenH),0,0,
+                               0,Math.min(screenW, screenH),0,
+                               0,0,1];
+        screenMatrix.w = 3;
+        screenMatrix.h = 3;
+        camera.trans = addVec(camera.pos, [screenW/2, screenH/2, 0]);
+    };
+    
+    camera.updateRotation(alpha, beta);
     
     return camera;
 }
 
 function applyCameraTransform(camera, vec, res) {
     res = res || makeVec3();
-    matXvec(camera.rotmatrix, vec, res);
+    subVec(vec, camera.trans, res);
+    matXvec(camera.matrix, vec, res);
     return res;
+}
+
+function makePoint(pos, mass) {
+    return {pos: pos, mass: mass};
+}
+
+function makeSpring(pa, pb, l, k) {
+    return {pa: pa, pb: pb, l: l, k: k};
 }
 
 //Point: {pos: [x,y,z], mass: point_mass}
@@ -33,6 +54,7 @@ function makeSoftBody(points, springs) {
         point.v = makeVec3(0,0,0);
         point.force = makeVec3(0,0,0);
         point.ground = false;
+        point.scrPos = makeVec3(0,0,0);
     });
     return {points: points, springs: springs};
 }
@@ -103,7 +125,17 @@ function makeSimWorld(settings) {
     };
     
     world.draw = function(camera, screen) {
-        
+        this.bodies.forEach(function (body) {
+            var i, pt, spr;
+            for (i=0; i<body.points.length; i++) {
+                pt = body.points[i];
+                applyCameraTransform(camera, pt.pos, pt.scrPos);
+                screen.drawPoint(pt.scrPost[0], pt.scrPos[1]);
+            }
+            for (i=0; i<body.springs.length; i++) {
+                spr = body.springs[i];
+            }
+        });
     };
     
     return world;
