@@ -156,8 +156,8 @@ function ang2rad(angle) {
 function rotateAxisAngle(unitAxis, phi, v, res) {
     return addArrOfVecs(
                 scalXvec( Math.cos(phi), v),
-                scalXvec( Math.sin(phi), crossVec(unitAxis, v) ),
-                scalXvec( dotVecs(unitAxis, v) * (1 - Math.cos(phi)), k) );
+                scalXvec( Math.sin(phi), crossVecs(unitAxis, v) ),
+                scalXvec( dotVecs(unitAxis, v) * (1 - Math.cos(phi)), unitAxis) );
 }
 
 //Quaternions
@@ -170,7 +170,7 @@ function mulQuats(A, B, res) {
         v2 = [B[2], B[3], B[4]];
     res[0] = s1*s2 - dotVecs(v1, v2);
     var v = addArrOfVecs( [
-        scalXvec(s1, v2), scalXvec(s2, v1), crossVec(v1, v2)
+        scalXvec(s1, v2), scalXvec(s2, v1), crossVecs(v1, v2)
     ] );
     res[1] = v[0];
     res[2] = v[1];
