@@ -6,6 +6,37 @@ Simulation of soft wormlike creature
 <style type="text/css" media="screen">
     body { padding: 0; margin: 0; }
     div { padding: 0; margin: 0; }
+    #controls {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        height: 60px;
+        background-color: #D1DBDD;
+        padding-top: 12px;
+        padding-left: 15px;
+        min-height: 64px;
+        min-width: 64px;
+        z-index: 10;
+    }
+    .btn {
+      background: #3498db;
+      background-image: linear-gradient(to bottom, #3498db, #2980b9);
+      border-radius: 28px;
+      font-family: Arial;
+      color: #ffffff;
+      font-size: 18px;
+      padding: 10px 20px 10px 20px;
+      text-decoration: none;
+      cursor: pointer;
+      margin-right: 15px;
+      display: inline-block;
+      float: left;
+    }
+    .btn:hover {
+      background: #3cb0fd;
+      background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+      text-decoration: none;
+    }
 </style>
 </head>
 <script src="util.js" type="text/javascript"></script>
@@ -13,6 +44,7 @@ Simulation of soft wormlike creature
 <script src="sim.js" type="text/javascript"></script>
 <script src="worm.js" type="text/javascript"></script>
 <body onload="runWormDemo()">
+<div id="controls"></div>
 </body>
 </html>
 

@@ -45,7 +45,7 @@ function makeRingZ(R, N, mass, k) {
 }
 
 function getRingRadius(ring) {
-    return distVec3(ring.points[ring.points.length-1], ring.points[0]);
+    return distVec3(ring.points[ring.points.length-1].pos, ring.points[0].pos);
 }
 
 //Returns list of springs and muscles
@@ -96,9 +96,15 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
     var lines = new Array(N);
     var i,j;
     
+    var points = [];
+    var springs = [];
+    
     for (i=0; i<L; i++) {
         var R = radialProfile(i/L);
-        rings.push(translatePoints(makeVec3(i*dist, 0, 0), rotatePoints(makeVec3(0,1,0), Math.PI/2, makeRingZ(R, N, mass, k))));
+        var ring = makeRingZ(R, N, mass, k);
+        points = points.concat(ring.points);
+        springs = springs.concat(ring.springs);
+        rings.push(translatePoints(makeVec3(i*dist, 0, 0), rotatePoints(makeVec3(0,1,0), Math.PI/2, ring)));
     }
     
     for (i=0; i<L-1; i++) {
@@ -111,7 +117,9 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
         }
     }
     
-    return {rings: rings, lines: lines};
+    springs = springs.concat(axialSprings);
+    
+    return {rings: rings, lines: lines, points: points, springs: springs};
 }
 
 function makeGraphics() {
@@ -136,20 +144,21 @@ function makeGraphics() {
         this.canvas.setAttribute('width', w);
         this.canvas.setAttribute('height', h);
         
-        //Reset trandform to default
+        //Reset transform to default
         this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         
         if (w > h) {
-            this.scale = h/this.size;
+            this.scale = 1;//h/this.size;
             this.py = 0;
             this.px = (w-h)/2;
         } else {
-            this.scale = w/this.size;
+            this.scale = 1;//w/this.size;
             this.px = 0;
             this.py = (h-w)/2;
         }
         
-        this.ctx.setTransform(this.scale, 0, 0, -this.scale, this.px, h);
+        //this.ctx.setTransform(this.scale, 0, 0, -this.scale, this.px, h);
+        this.ctx.setTransform(this.scale, 0, 0, -this.scale, w/2, h/2);
         graphics.clear();
     };
     
@@ -198,6 +207,17 @@ function makeGraphics() {
     return graphics;
 }
 
+function addButton(label, onclick) {
+    var dom = document.createElement('a');
+    getbyid('controls').appendChild(dom);
+    dom.className = 'btn';
+    dom.innerHTML = label;
+    if (typeof onclick == 'function') dom.onclick = onclick;
+    return dom;
+}
+
+function getbyid(id) { return document.getElementById(id); }
+
 //Worm parameters
 
 //Middle radius
@@ -226,11 +246,34 @@ var wormProfile = function(x) {
 
 function runWormDemo() {
     console.log("Start");
+    
     graphics = makeGraphics();
     graphics.resize();
-    graphics.drawCircle( 0, 0, 0.1, false, "#FF00FF");
+    graphics.drawCircle( 0, 0, 1, false, "#FF00FF");
     
-    var body = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
+    world = makeSimWorld();
     
-    debugger;
+    //camera = makeCamera([0,0,0], Math.PI/4, Math.PI/6, graphics.w, graphics.h, 1);
+    camera = makeCamera([0,0,0], 0, 0, graphics.w, graphics.h, 0.01);
+    
+    worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
+    
+    wormSoftBody = makeSoftBody(worm.points, worm.springs);
+    
+    world.addSoftBody(wormSoftBody);
+    
+    function redraw() {
+        graphics.clear();
+        world.draw(camera, graphics);
+    }
+    
+    redraw();
+    
+    addButton("up", function () { camera.moveRel(scalXvec(1,camera.top)); redraw(); });
+    addButton("down", function () { camera.moveRel(scalXvec(-1,camera.top)); redraw(); });
+    addButton("right", function () { camera.moveRel(scalXvec(0.01,camera.right)); redraw(); });
+    addButton("left", function () { camera.moveRel(scalXvec(-1,camera.right)); redraw(); });
 }
+
+
+

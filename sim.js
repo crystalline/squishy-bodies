@@ -2,40 +2,62 @@
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 //Camera is isometric by default
-function makeCamera(position, alpha, beta, screenW, screenH) {
+function makeCamera(position, alpha, beta, screenW, screenH, scale) {
     var camera = {pos: position};
     
     camera.refTop = [0,0,1];
     camera.refRight = [0,1,0];
     
-    camera.updateTransform = function (alpha, beta) {
-        camera.rotTop = makeQuaternionRotation(refRight, -alpha);
-        camera.rotRight = makeQuaternionRotation(refTop, -beta);
+    camera.updateTransform = function (alpha, beta, screenW, screenH, scale) {
+        camera.scale = scale || camera.scale;
+        camera.alpha = alpha || camera.scale;
+        camera.beta = beta || camera.scale;
+        camera.screenW = screenW || camera.scale;
+        camera.screenH = screenH || camera.scale;
+        
+        camera.rotTop = makeQuaternionRotation(camera.refRight, -camera.alpha);
+        camera.rotRight = makeQuaternionRotation(camera.refTop, -camera.beta);
     
-        camera.top = applyQuaternionRotation(rotTop, refTop);
-        camera.right = applyQuaternionRotation(rotRight, refRight);
+        camera.top = applyQuaternionRotation(camera.rotTop, camera.refTop);
+        camera.right = applyQuaternionRotation(camera.rotRight, camera.refRight);
         camera.forward = crossVecs(camera.top, camera.right);
         
-        camera.rotation = mulQuats(rotTop, rotRight);
-        camera.matrix = quaternionToRotMatrix(camera.rotation);
+        camera.rotation = mulQuats(camera.rotTop, camera.rotRight);
+
+        camera.screenMatrix = makeMatrix(3,3,
+            [Math.min(camera.screenW, camera.screenH)*camera.scale,0,0,
+             0,Math.min(camera.screenW, camera.screenH)*camera.scale,0,
+             0,0,1]);
         
-        camera.screenMatrix = [Math.min(screenW, screenH),0,0,
-                               0,Math.min(screenW, screenH),0,
-                               0,0,1];
-        screenMatrix.w = 3;
-        screenMatrix.h = 3;
-        camera.trans = addVec(camera.pos, [screenW/2, screenH/2, 0]);
+        camera.matrix = matXmat(quaternionToRotMatrix(camera.rotation), camera.screenMatrix);
+        
+        camera.trans = camera.pos;//addVecs(camera.pos, [0.5, 0.5]);
     };
     
-    camera.updateRotation(alpha, beta);
+    camera.zoom = function(delta) {
+        this.scale *= (delta || 1);
+        this.updateTransform();
+    };
+    
+    camera.moveRel = function (posDelta, alpha, beta) {
+        console.log(this.pos);
+        addVecs(this.pos, posDelta || makeVec3(0,0,0), this.pos);
+        console.log(this.pos);
+        this.alpha += (alpha || 0);
+        this.beta += (beta || 0);
+        this.updateTransform();
+    };
+    
+    camera.updateTransform(alpha, beta, screenW, screenH, scale);
     
     return camera;
 }
 
 function applyCameraTransform(camera, vec, res) {
-    res = res || makeVec3();
-    subVec(vec, camera.trans, res);
-    matXvec(camera.matrix, vec, res);
+    res = res || makeVec3(0,0,0);
+    temp = makeVec3(0,0,0);
+    subVecs(vec, camera.trans, temp);
+    matXvec(camera.matrix, temp, res);
     return res;
 }
 
@@ -62,7 +84,7 @@ function makeSoftBody(points, springs) {
 function computeSpringForces(spring) {
     var pa = spring.pa;
     var pb = spring.pb;
-    var diff = subVec(pb.pos, pa.pos);
+    var diff = subVecs(pb.pos, pa.pos);
     var length = l2norm(diff);
     var normal = scalXvec(1/length, diff);
     var force = scalXvec(spring.k*(length-spring.d), normal);
@@ -130,7 +152,7 @@ function makeSimWorld(settings) {
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
                 applyCameraTransform(camera, pt.pos, pt.scrPos);
-                screen.drawPoint(pt.scrPost[0], pt.scrPos[1]);
+                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], 2);
             }
             for (i=0; i<body.springs.length; i++) {
                 spr = body.springs[i];

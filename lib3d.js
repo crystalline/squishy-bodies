@@ -34,10 +34,16 @@ function makeQuat(w,x,y,z) {
     return [w,x,y,z];
 }
 
-function makeMatrix(w, h) {
+function makeMatrix(w, h, init) {
     var m = makeArray(w*h, 0);
     m.w = w;
     m.h = h;
+    if (init && init.length) {
+        var i;
+        for (i=0;i<w*h;i++) {
+            m[i] = init[i];
+        }
+    }
     return m;
 }
 
@@ -87,7 +93,7 @@ function normalize(vec, res) {
 }
 
 function addVecs(va, vb, res) {
-    res = res || new Array(vec.length);
+    res = res || new Array(va.length);
     var i;
     for (i=0; i<va.length; i++) {
         res[i] = va[i] + vb[i];
@@ -97,8 +103,9 @@ function addVecs(va, vb, res) {
 
 function addArrOfVecs(arr, res) {
     if (arr.length < 2) return;
-    var i, n = arr[0].length;
+    var i, j, n = arr[0].length;
     res = res || new Array(n);
+    for (j=0; j<n; j++) { res[j] = 0; }
     for (i=0; i<arr.length; i++) {
         addVecs(res, arr[i], res);
     }
@@ -106,7 +113,7 @@ function addArrOfVecs(arr, res) {
 }
 
 function subVecs(va, vb, res) {
-    res = res || new Array(vec.length);
+    res = res || new Array(va.length);
     var i;
     for (i=0; i<va.length; i++) {
         res[i] = va[i] - vb[i];
@@ -124,9 +131,9 @@ function dotVecs(va, vb) {
 
 function crossVecs(a, b, res) {
     res = res || new Array(3);
-    res[0] = a[2]*b[3] - a[3]*b[2];
-    res[1] = a[3]*b[1] - a[1]*b[3];
-    res[2] = a[1]*b[2] - a[2]*b[1];
+    res[0] = a[1]*b[2] - a[2]*b[1];
+    res[1] = a[2]*b[0] - a[0]*b[2];
+    res[2] = a[0]*b[1] - a[1]*b[0];
     return res;
 }
 
@@ -146,6 +153,7 @@ function matXmat(a, b, res) {
             }
         }
     }
+    return res;
 }
 
 function ang2rad(angle) {
@@ -154,10 +162,11 @@ function ang2rad(angle) {
 
 //Rodriguez formula
 function rotateAxisAngle(unitAxis, phi, v, res) {
-    return addArrOfVecs(
+    return addArrOfVecs( [
                 scalXvec( Math.cos(phi), v),
                 scalXvec( Math.sin(phi), crossVecs(unitAxis, v) ),
-                scalXvec( dotVecs(unitAxis, v) * (1 - Math.cos(phi)), unitAxis) );
+                scalXvec( dotVecs(unitAxis, v) * (1 - Math.cos(phi)), unitAxis)
+           ] );
 }
 
 //Quaternions
@@ -165,9 +174,9 @@ var addQuats = addVecs;
 
 function mulQuats(A, B, res) {
     res = res || new Array(4);
-    var s1 = A[1], s2 = B[1],
-        v1 = [A[2], A[3], A[4]],
-        v2 = [B[2], B[3], B[4]];
+    var s1 = A[0], s2 = B[0],
+        v1 = [A[1], A[2], A[3]],
+        v2 = [B[1], B[2], B[3]];
     res[0] = s1*s2 - dotVecs(v1, v2);
     var v = addArrOfVecs( [
         scalXvec(s1, v2), scalXvec(s2, v1), crossVecs(v1, v2)
@@ -204,6 +213,7 @@ function makeQuaternionRotation(unitAxis, phi, res) {
 function applyQuaternionRotation(q, v, res) {
     var vtemp = [0, v[0], v[1], v[2]];
     var qres = mulQuats( mulQuats( q, vtemp ), conjQuat( q ) );
+    var res = res || makeVec3(0,0,0);
     res[0] = qres[1];
     res[1] = qres[2];
     res[2] = qres[3];
