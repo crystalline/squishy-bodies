@@ -9,29 +9,32 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
     camera.refRight = [0,1,0];
     
     camera.updateTransform = function (alpha, beta, screenW, screenH, scale) {
-        camera.scale = scale || camera.scale;
-        camera.alpha = alpha || camera.scale;
-        camera.beta = beta || camera.scale;
-        camera.screenW = screenW || camera.scale;
-        camera.screenH = screenH || camera.scale;
         
-        camera.rotTop = makeQuaternionRotation(camera.refRight, -camera.alpha);
-        camera.rotRight = makeQuaternionRotation(camera.refTop, -camera.beta);
-    
-        camera.top = applyQuaternionRotation(camera.rotTop, camera.refTop);
-        camera.right = applyQuaternionRotation(camera.rotRight, camera.refRight);
-        camera.forward = crossVecs(camera.top, camera.right);
+        if (util.isNumeric(alpha)) this.alpha = alpha;
+        if (util.isNumeric(beta)) this.beta = beta;
+        if (util.isNumeric(screenW)) this.screenW = screenW;
+        if (util.isNumeric(screenH)) this.screenH = screenH;
+        if (util.isNumeric(scale)) this.scale = scale;
         
-        camera.rotation = mulQuats(camera.rotTop, camera.rotRight);
+        this.rotTop = makeQuaternionRotation(this.refRight, -this.alpha);
+        this.rotRight = makeQuaternionRotation(this.refTop, -this.beta);
 
-        camera.screenMatrix = makeMatrix(3,3,
-            [Math.min(camera.screenW, camera.screenH)*camera.scale,0,0,
-             0,Math.min(camera.screenW, camera.screenH)*camera.scale,0,
+        this.top = applyQuaternionRotation(this.rotTop, this.refTop);
+        this.right = applyQuaternionRotation(this.rotRight, this.refRight);
+        this.forward = crossVecs(this.top,this.right);
+
+        this.rotation = mulQuats(this.rotTop, this.rotRight);
+
+        this.screenMatrix = makeMatrix(3,3,
+            [Math.min(this.screenW,this.screenH)*this.scale,0,0,
+             0,Math.min(this.screenW,this.screenH)*this.scale,0,
              0,0,1]);
-        
-        camera.matrix = matXmat(quaternionToRotMatrix(camera.rotation), camera.screenMatrix);
-        
-        camera.trans = camera.pos;//addVecs(camera.pos, [0.5, 0.5]);
+
+        this.matrix = matXmat(quaternionToRotMatrix(this.rotation), this.screenMatrix);
+
+        //this.trans = makeVec3(0,0,0);
+        //matXvec(this.matrix,this.pos,this.trans);
+        this.trans = this.pos;
     };
     
     camera.zoom = function(delta) {
@@ -56,6 +59,8 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
 function applyCameraTransform(camera, vec, res) {
     res = res || makeVec3(0,0,0);
     temp = makeVec3(0,0,0);
+    //matXvec(camera.matrix, vec, temp);
+    //subVecs(temp, camera.trans, res);
     subVecs(vec, camera.trans, temp);
     matXvec(camera.matrix, temp, res);
     return res;
@@ -156,6 +161,39 @@ function makeSimWorld(settings) {
             }
             for (i=0; i<body.springs.length; i++) {
                 spr = body.springs[i];
+            }
+            //Draw grid
+            var gridA = makeVec3(0,0,0);
+            var gridB = makeVec3(0,0,0);
+            var Ngrid = 10;
+            var gStep = 10;
+            var gWidth = 1;
+            var ptA = makeVec3(0,0,0);
+            var ptB = makeVec3(0,0,0);
+            
+            gridA[0] = -(Ngrid*gStep/2);
+            gridA[1] = -(Ngrid*gStep/2);
+            gridB[0] = -(Ngrid*gStep/2);
+            gridB[1] = (Ngrid*gStep/2);
+            for (i=0; i<=Ngrid; i++) {
+                applyCameraTransform(camera, gridA, ptA);
+                applyCameraTransform(camera, gridB, ptB);
+                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gWidth);
+                gridA[0]+=gStep;
+                gridB[0]+=gStep;
+
+            }
+            
+            gridA[0] = -(Ngrid*gStep/2);
+            gridA[1] = -(Ngrid*gStep/2);
+            gridB[0] = (Ngrid*gStep/2);
+            gridB[1] = -(Ngrid*gStep/2);
+            for (i=0; i<=Ngrid; i++) {
+                applyCameraTransform(camera, gridA, ptA);
+                applyCameraTransform(camera, gridB, ptB);
+                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gWidth);
+                gridA[1]+=gStep;
+                gridB[1]+=gStep;
             }
         });
     };

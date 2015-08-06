@@ -2,6 +2,9 @@
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 util = {
+    isNumeric: function(n) {
+        return !isNaN(n) && isFinite(n);
+    },
     simpleExtend: function(dst, src) {
         for (var k in src) {
             if (src.hasOwnProperty(k)) {

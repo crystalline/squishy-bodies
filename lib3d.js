@@ -149,7 +149,7 @@ function matXmat(a, b, res) {
         for (j=0; j<b.w; j++) {
             res[a.w*i+j] = 0;
             for (k=0; k<a.w; k++) {
-                res[a.w*i+j] += a[a.w*i+k] * b[j+k*b.w]
+                res[a.w*i+j] += a[a.w*i+k] * b[j+k*b.w];
             }
         }
     }
@@ -202,6 +202,7 @@ function invQuat(A, res) {
 
 function makeQuaternionRotation(unitAxis, phi, res) {
     res = res || new Array(4);
+    if (Math.abs(phi) < epsilon) { res[0] = 1; res[1] = 0; res[2] = 0; res[3] = 0; return res; }
     res[0] = Math.cos(phi*0.5);
     var s = Math.sin(phi*0.5);
     res[1] = s*unitAxis[1];

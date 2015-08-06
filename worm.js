@@ -119,7 +119,11 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
     
     springs = springs.concat(axialSprings);
     
-    return {rings: rings, lines: lines, points: points, springs: springs};
+    var body = {rings: rings, lines: lines, points: points, springs: springs};
+    
+    translatePoints(makeVec3(-L*dist/2,0,0), body);
+    
+    return body;
 }
 
 function makeGraphics() {
@@ -271,7 +275,7 @@ function runWormDemo() {
     
     addButton("up", function () { camera.moveRel(scalXvec(1,camera.top)); redraw(); });
     addButton("down", function () { camera.moveRel(scalXvec(-1,camera.top)); redraw(); });
-    addButton("right", function () { camera.moveRel(scalXvec(0.01,camera.right)); redraw(); });
+    addButton("right", function () { camera.moveRel(scalXvec(1,camera.right)); redraw(); });
     addButton("left", function () { camera.moveRel(scalXvec(-1,camera.right)); redraw(); });
 }
 
