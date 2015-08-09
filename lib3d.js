@@ -50,7 +50,7 @@ function makeMatrix(w, h, init) {
 }
 
 function makeIdentityMat(w,h) {
-    return makeMatrix(w,h, function(i,j) { console.log(arguments); if (i==j) return 1; else return 0; });
+    return makeMatrix(w,h, function(i,j) { if (i==j) return 1; else return 0; });
 }
 
 function l2norm(v) {

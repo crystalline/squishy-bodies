@@ -238,6 +238,22 @@ function addButton(label, onclick) {
 
 function getbyid(id) { return document.getElementById(id); }
 
+//Sim parameters
+var worldSettings = {
+    surfaceK: 5.0,
+    surfaceDrag: 0.28,
+    anisoFriction: false,
+    surfaceDragTan: 0.28,
+    surfaceDragNorm: 0.01,
+    airDrag: 0.01,
+    g: 1.0
+}
+
+//Controller parameters
+var period = 700;
+var startTime = 250;
+var freq = 2.5;
+
 //Worm parameters
 
 //Middle radius
@@ -271,21 +287,20 @@ function runWormDemo() {
     graphics.resize();
     graphics.drawCircle( 0, 0, 1, false, "#FF00FF");
     
-    world = makeSimWorld();
+    world = makeSimWorld(worldSettings);
     
-    //camera = makeCamera([0,0,0], Math.PI/4, Math.PI/6, graphics.w, graphics.h, 1);
-    camera = makeCamera([0,0,0], Math.PI/4, Math.PI/6, graphics.w, graphics.h, 0.04);
+    camera = makeCamera([0,0,0], Math.PI/4, Math.PI/3, graphics.w, graphics.h, 0.04);
     
     worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
     
     wormSoftBody = makeSoftBody(worm.points, worm.springs);
     
     world.addSoftBody(wormSoftBody);
-        
+    
     var gui = new dat.GUI();
     
     var cam = {alpha: rad2ang(camera.alpha), beta: rad2ang(camera.beta),
-               scale: 0.05, x: 0, y:0, z:0};
+               scale: 0.04, x: 0, y:0, z:0};
     var config = {pause: false};
     
     function camUpdate(value) {
@@ -297,13 +312,55 @@ function runWormDemo() {
     };
     
     gui.add(config, "pause").onFinishChange(function(val) {if (!val) requestAnimationFrame(draw)});
-    gui.add(cam, "alpha", -180, 180).onFinishChange(camUpdate);
-    gui.add(cam, "beta", -180, 180).onFinishChange(camUpdate);
-    gui.add(cam, "scale").onFinishChange(camUpdate);
-    gui.add(cam, "x").onFinishChange(camUpdate);
-    gui.add(cam, "y").onFinishChange(camUpdate);
-    gui.add(cam, "z").onFinishChange(camUpdate);
+    gui.add(cam, "alpha", -180, 180).onChange(camUpdate);
+    gui.add(cam, "beta", -180, 180).onChange(camUpdate);
+    gui.add(cam, "scale").onChange(camUpdate);
+    gui.add(cam, "x").onChange(camUpdate);
+    gui.add(cam, "y").onChange(camUpdate);
+    gui.add(cam, "z").onChange(camUpdate);
     
+    gui.updateManually = function() {
+        var gui = this;
+        // Iterate over all controllers
+        for (var i in gui.__controllers) {
+            gui.__controllers[i].updateDisplay();
+        }
+    };
+    
+    //Mouse event handling
+    mouseDown = 0;
+    px=false;
+    py=false;
+    
+    window.addEventListener("resize", function() {
+        graphics.resize();
+        camera.screenW = window.innerWidth;
+        camera.screenH = window.innerHeight;
+        camera.updateTransform();
+    }, false);
+    
+    graphics.canvas.addEventListener("mousemove", function(event) {
+        var x = event.pageX;
+        var y = event.pageY;
+        if (mouseDown && px && py) {
+            cam.beta -= (y - py);
+            cam.alpha -= (x - px);
+            gui.updateManually();
+            camUpdate();
+        }
+        px = x;
+        py = y;
+    }, false);
+    graphics.canvas.onmousedown = function() { 
+        mouseDown = 1;
+    }
+    graphics.canvas.onmouseup = function() {
+        mouseDown = 0;
+        px=false;
+        py=false;
+    }
+    
+    //Mainloop
     var prevFrameT = Date.now();
     
     function draw() {
@@ -312,7 +369,7 @@ function runWormDemo() {
             camera.needUpdate = false;
             camera.updateTransform();
         }
-        //world.step(1/50);
+        world.step(0.01);
         graphics.clear();
         world.draw(camera, graphics);
         var time = Date.now();

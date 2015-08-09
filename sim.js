@@ -6,7 +6,7 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
     var camera = {pos: position};
     
     camera.refTop = [0,0,1];
-    camera.refRight = [0,1,0];
+    camera.refRight = [1,0,0];
     
     camera.updateTransform = function (alpha, beta, screenW, screenH, scale) {
         
@@ -15,19 +15,16 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         if (util.isNumeric(screenW)) this.screenW = screenW;
         if (util.isNumeric(screenH)) this.screenH = screenH;
         if (util.isNumeric(scale)) this.scale = scale;
-        
+                
         this.rotTop = makeQuaternionRotation(this.refTop, -this.alpha);
         this.rotRight = makeQuaternionRotation(this.refRight, -this.beta);
         
-        console.log(this.rotTop);
-        console.log(this.rotRight);
-        
-        this.right = applyQuaternionRotation(this.rotTop, this.refRight);
+        this.right = applyQuaternionRotation(this.rotTop, this.refRight);        
         this.top = applyQuaternionRotation(this.rotRight, this.refTop);
-
+        
         this.forward = crossVecs(this.top, this.right);
-
-        this.rotation = mulQuats(this.rotTop, this.rotRight);
+        
+        this.rotation = mulQuats(this.rotRight,this.rotTop);
         
         var screenScaling = Math.min(this.screenW,this.screenH)*this.scale;
         
@@ -63,8 +60,6 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
 function applyCameraTransform(camera, vec, res) {
     res = res || makeVec3(0,0,0);
     temp = makeVec3(0,0,0);
-    //matXvec(camera.matrix, vec, temp);
-    //subVecs(temp, camera.trans, res);
     subVecs(vec, camera.trans, temp);
     matXvec(camera.matrix, temp, res);
     return res;
@@ -96,11 +91,19 @@ function computeSpringForces(spring) {
     var diff = subVecs(pb.pos, pa.pos);
     var length = l2norm(diff);
     var normal = scalXvec(1/length, diff);
-    var force = scalXvec(spring.k*(length-spring.d), normal);
+    var force = scalXvec(spring.k*(length-spring.l), normal);
     
     addVecs(pa.force, force, pa.force);
     var force = scalXvec(-1, force, force);
-    addVecs(pb.force, force, pa.force);
+    addVecs(pb.force, force, pb.force);
+}
+
+function computeAnisoFriction(point, world) {
+    
+}
+
+function computeSimpleFriction(point, world) {
+    addVecs(point.force, scalXvec(-world.surfaceDrag, point.v), point.force);
 }
 
 function computePointForces(point, world) {
@@ -111,28 +114,28 @@ function computePointForces(point, world) {
         point.ground = true;
         point.force[2] -= world.surfaceK * z;
         if (anisoFriction) {
-            /*  (if anisotropic-friction
-				  (setf F (aniso-friction p))
-				  (setf F (simple-friction p)))
-    	    */
+            computeAnisoFriction(point, world);
+        } else {
+            computeSimpleFriction(point, world);
         }
-        
     } else {
         point.ground = false;
+        //Add air drag force
+        addVecs(point.force, scalXvec(-world.airDrag, point.v), point.force);
     }
     
-    point.force[2] -= world.g * point.m;
+    point.force[2] -= world.g * point.mass;
 }
 
 function integratePoint(point, dt) {
-    addVecs(point.v, scalXvec(dt/point.m, point.force), point.v);
+    addVecs(point.v, scalXvec(dt/point.mass, point.force), point.v);
     addVecs(point.pos, scalXvec(dt, point.v), point.pos);
     zeroVec3(point.force);
 }
 
 function makeSimWorld(settings) {
     
-    var world = {timestep: 0};
+    var world = {timestep: 0, g: 1, surfaceK: 5};
     util.simpleExtend(world, settings);
     world.bodies = [];
     
@@ -141,6 +144,7 @@ function makeSimWorld(settings) {
     };
     
     world.step = function(dt) {
+        var that = this;
         this.bodies.forEach(function (body) {
             var i, pt, spr;
             for (i=0; i<body.springs.length; i++) {
@@ -149,15 +153,15 @@ function makeSimWorld(settings) {
             }
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
-                computePointForces(pt, this);
-                integratePoint(pt);
+                computePointForces(pt, that);
+                integratePoint(pt, dt);
             }
         });
         this.timestep++;
     };
     
     world.draw = function(camera, screen) {
-        var ptW = 3, lineW = 2, gridW = 1;
+        var ptW = 3, lineW = 1, gridW = 1;
         this.bodies.forEach(function (body) {
             var i, pt, spr, ptA, ptB;
             for (i=0; i<body.points.length; i++) {
