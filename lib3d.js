@@ -38,17 +38,23 @@ function makeMatrix(w, h, init) {
     var m = makeArray(w*h, 0);
     m.w = w;
     m.h = h;
-    if (init && init.length) {
+    if (init) {
         var i;
-        for (i=0;i<w*h;i++) {
-            m[i] = init[i];
+        for (i=0; i<w*h; i++) {
+            if (typeof init == 'number') { m[i] = init; }
+            else if (typeof init == 'function') { m[i] = init(Math.floor(i/w), i%w); }
+            else if (init.length) { m[i] = init[i]; }
         }
     }
     return m;
 }
 
+function makeIdentityMat(w,h) {
+    return makeMatrix(w,h, function(i,j) { console.log(arguments); if (i==j) return 1; else return 0; });
+}
+
 function l2norm(v) {
-    var i, result;
+    var i, result = 0;
     for (i=0; i<v.length; i++) {
         result += v[i]*v[i];
     }
@@ -147,13 +153,38 @@ function matXmat(a, b, res) {
     var i,j,k;
     for (i=0; i<a.h; i++) {
         for (j=0; j<b.w; j++) {
-            res[a.w*i+j] = 0;
+            res[b.w*i+j] = 0;
             for (k=0; k<a.w; k++) {
-                res[a.w*i+j] += a[a.w*i+k] * b[j+k*b.w];
+                res[b.w*i+j] += a[a.w*i+k] * b[j+k*b.w];
             }
         }
     }
     return res;
+}
+
+function rotMatFromEulerAngles(angle_x, angle_y, angle_z, mat) {
+    var mat = mat || makeMat(3,3);
+    
+    var A       = cos(angle_x);
+    var B       = sin(angle_x);
+    var C       = cos(angle_y);
+    var D       = sin(angle_y);
+    var E       = cos(angle_z);
+    var F       = sin(angle_z);
+    var AD      =   A * D;
+    var BD      =   B * D;
+
+    mat[0]  =   C * E;
+    mat[1]  =  -C * F;
+    mat[2]  =  -D;
+    mat[3]  = -BD * E + A * F;
+    mat[4]  =  BD * F + A * E;
+    mat[5]  =  -B * C;
+    mat[6]  =  AD * E + B * F;
+    mat[7]  = -AD * F + B * E;
+    mat[8] =   A * C;
+    
+    return mat;
 }
 
 function ang2rad(angle) {
@@ -205,9 +236,10 @@ function makeQuaternionRotation(unitAxis, phi, res) {
     if (Math.abs(phi) < epsilon) { res[0] = 1; res[1] = 0; res[2] = 0; res[3] = 0; return res; }
     res[0] = Math.cos(phi*0.5);
     var s = Math.sin(phi*0.5);
-    res[1] = s*unitAxis[1];
+    res[1] = s*unitAxis[0];
     res[2] = s*unitAxis[1];
-    res[3] = s*unitAxis[1];
+    res[3] = s*unitAxis[2];
+    normalize(res, res);
     return res;
 }
 

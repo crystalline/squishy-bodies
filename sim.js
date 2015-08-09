@@ -16,24 +16,28 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         if (util.isNumeric(screenH)) this.screenH = screenH;
         if (util.isNumeric(scale)) this.scale = scale;
         
-        this.rotTop = makeQuaternionRotation(this.refRight, -this.alpha);
-        this.rotRight = makeQuaternionRotation(this.refTop, -this.beta);
+        this.rotTop = makeQuaternionRotation(this.refTop, -this.alpha);
+        this.rotRight = makeQuaternionRotation(this.refRight, -this.beta);
+        
+        console.log(this.rotTop);
+        console.log(this.rotRight);
+        
+        this.right = applyQuaternionRotation(this.rotTop, this.refRight);
+        this.top = applyQuaternionRotation(this.rotRight, this.refTop);
 
-        this.top = applyQuaternionRotation(this.rotTop, this.refTop);
-        this.right = applyQuaternionRotation(this.rotRight, this.refRight);
-        this.forward = crossVecs(this.top,this.right);
+        this.forward = crossVecs(this.top, this.right);
 
         this.rotation = mulQuats(this.rotTop, this.rotRight);
-
+        
+        var screenScaling = Math.min(this.screenW,this.screenH)*this.scale;
+        
         this.screenMatrix = makeMatrix(3,3,
-            [Math.min(this.screenW,this.screenH)*this.scale,0,0,
-             0,Math.min(this.screenW,this.screenH)*this.scale,0,
-             0,0,1]);
+            [screenScaling,0,0,
+             0,screenScaling,0,
+             0,0,screenScaling]);
 
         this.matrix = matXmat(quaternionToRotMatrix(this.rotation), this.screenMatrix);
-
-        //this.trans = makeVec3(0,0,0);
-        //matXvec(this.matrix,this.pos,this.trans);
+        
         this.trans = this.pos;
     };
     
@@ -152,22 +156,25 @@ function makeSimWorld(settings) {
     };
     
     world.draw = function(camera, screen) {
+        var ptW = 3, lineW = 2, gridW = 1;
         this.bodies.forEach(function (body) {
-            var i, pt, spr;
+            var i, pt, spr, ptA, ptB;
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
                 applyCameraTransform(camera, pt.pos, pt.scrPos);
-                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], 2);
+                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], ptW);
             }
             for (i=0; i<body.springs.length; i++) {
                 spr = body.springs[i];
+                ptA = spr.pa;
+                ptB = spr.pb;
+                screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW);
             }
             //Draw grid
             var gridA = makeVec3(0,0,0);
             var gridB = makeVec3(0,0,0);
             var Ngrid = 10;
             var gStep = 10;
-            var gWidth = 1;
             var ptA = makeVec3(0,0,0);
             var ptB = makeVec3(0,0,0);
             
@@ -178,7 +185,7 @@ function makeSimWorld(settings) {
             for (i=0; i<=Ngrid; i++) {
                 applyCameraTransform(camera, gridA, ptA);
                 applyCameraTransform(camera, gridB, ptB);
-                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gWidth);
+                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gridW);
                 gridA[0]+=gStep;
                 gridB[0]+=gStep;
 
@@ -191,7 +198,7 @@ function makeSimWorld(settings) {
             for (i=0; i<=Ngrid; i++) {
                 applyCameraTransform(camera, gridA, ptA);
                 applyCameraTransform(camera, gridB, ptB);
-                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gWidth);
+                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gridW);
                 gridA[1]+=gStep;
                 gridB[1]+=gStep;
             }

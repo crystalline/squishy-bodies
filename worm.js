@@ -28,12 +28,14 @@ function makeRingZ(R, N, mass, k) {
     var i;
     
     for (i=0; i<N; i++) {
-        points.push(makePoint(rotateAxisAngle(axis, phi*i, makeVec3(R,0,0)), mass));
+        points.push(makePoint(rotateAxisAngle(axis, phi*i, rvec), mass));
     }
     
     for (i=0; i<N-1; i++) {
         springs.push(makeSpring(points[i], points[i+1], dist, k));
     }
+    
+    springs.push(makeSpring(points[N-1], points[0], dist, k));
     
     points.push(makePoint(makeVec3(0,0,0), mass));
     
@@ -41,7 +43,9 @@ function makeRingZ(R, N, mass, k) {
         springs.push(makeSpring(points[points.length-1], points[i], R, k));
     }
     
-    return {points: points, springs: springs};
+    var body = {points: points, springs: springs};
+    
+    return body;
 }
 
 function getRingRadius(ring) {
@@ -63,6 +67,7 @@ function linkRings(A, B, dist, k) {
         for (i=0; i<A.points.length; i++) {
             //Create parallel spring
             var spr = makeSpring( A.points[i], B.points[i], dist, k);
+            springs.push(spr);
             //Add corresponding point as anisotropic friction pair
             A.points[i].afpair = B.points[i];
             //Create muscle if not in central fiber
@@ -105,6 +110,8 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
         points = points.concat(ring.points);
         springs = springs.concat(ring.springs);
         rings.push(translatePoints(makeVec3(i*dist, 0, 0), rotatePoints(makeVec3(0,1,0), Math.PI/2, ring)));
+        //rings.push(translatePoints(makeVec3(i*dist, 0, 0), ring));
+        //console.log(rings[rings.length-1]);
     }
     
     for (i=0; i<L-1; i++) {
@@ -152,11 +159,13 @@ function makeGraphics() {
         this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         
         if (w > h) {
-            this.scale = 1;//h/this.size;
+            this.scale = 1;
+            //this.scale = h/10;
             this.py = 0;
             this.px = (w-h)/2;
         } else {
-            this.scale = 1;//w/this.size;
+            this.scale = 1;
+            //this.scale = w/10;
             this.px = 0;
             this.py = (h-w)/2;
         }
@@ -258,7 +267,7 @@ function runWormDemo() {
     world = makeSimWorld();
     
     //camera = makeCamera([0,0,0], Math.PI/4, Math.PI/6, graphics.w, graphics.h, 1);
-    camera = makeCamera([0,0,0], 0, 0, graphics.w, graphics.h, 0.01);
+    camera = makeCamera([0,0,0], Math.PI/4, Math.PI/6, graphics.w, graphics.h, 0.04);
     
     worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
     
