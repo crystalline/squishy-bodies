@@ -143,7 +143,7 @@ function makeGraphics() {
     graphics.ctx = graphics.canvas.getContext('2d');
     graphics.ctx.fillStyle = '#2F49C2';
     graphics.ctx.strokeStyle = '#2F49C2';
-    
+    graphics.ctx.font = "60px Arial";
     graphics.size = 1;
     
     graphics.resize = function() {
@@ -215,6 +215,13 @@ function makeGraphics() {
         ctx.restore();
     };
     
+    graphics.drawText = function(text,x,y) {
+        this.ctx.save();
+        this.ctx.setTransform(2, 0, 0, 2, 0, 0);
+        this.ctx.fillText(text,x,y);
+        this.ctx.restore();
+    }
+    
     graphics.resize();
     
     return graphics;
@@ -274,18 +281,47 @@ function runWormDemo() {
     wormSoftBody = makeSoftBody(worm.points, worm.springs);
     
     world.addSoftBody(wormSoftBody);
+        
+    var gui = new dat.GUI();
     
-    function redraw() {
+    var cam = {alpha: rad2ang(camera.alpha), beta: rad2ang(camera.beta),
+               scale: 0.05, x: 0, y:0, z:0};
+    var config = {pause: false};
+    
+    function camUpdate(value) {
+        camera.needUpdate = true;
+        camera.alpha = ang2rad(cam.alpha);
+        camera.beta = ang2rad(cam.beta);
+        camera.pos = [cam.x, cam.y, cam.z];
+        camera.scale = cam.scale;
+    };
+    
+    gui.add(config, "pause").onFinishChange(function(val) {if (!val) requestAnimationFrame(draw)});
+    gui.add(cam, "alpha", -180, 180).onFinishChange(camUpdate);
+    gui.add(cam, "beta", -180, 180).onFinishChange(camUpdate);
+    gui.add(cam, "scale").onFinishChange(camUpdate);
+    gui.add(cam, "x").onFinishChange(camUpdate);
+    gui.add(cam, "y").onFinishChange(camUpdate);
+    gui.add(cam, "z").onFinishChange(camUpdate);
+    
+    var prevFrameT = Date.now();
+    
+    function draw() {
+        if (!config.pause) requestAnimationFrame(draw);
+        if (camera.needUpdate) { 
+            camera.needUpdate = false;
+            camera.updateTransform();
+        }
+        //world.step(1/50);
         graphics.clear();
         world.draw(camera, graphics);
+        var time = Date.now();
+        var frameT = time - prevFrameT;
+        graphics.drawText(Math.round(1000/(frameT))+' fps',10,10);
+        prevFrameT = time;
     }
     
-    redraw();
-    
-    addButton("up", function () { camera.moveRel(scalXvec(1,camera.top)); redraw(); });
-    addButton("down", function () { camera.moveRel(scalXvec(-1,camera.top)); redraw(); });
-    addButton("right", function () { camera.moveRel(scalXvec(1,camera.right)); redraw(); });
-    addButton("left", function () { camera.moveRel(scalXvec(-1,camera.right)); redraw(); });
+    draw();
 }
 
 

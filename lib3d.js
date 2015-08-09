@@ -191,6 +191,10 @@ function ang2rad(angle) {
     return 2 * Math.PI * (angle/360);
 }
 
+function rad2ang(angle) {
+    return 360*angle/(2 * Math.PI);
+}
+
 //Rodriguez formula
 function rotateAxisAngle(unitAxis, phi, v, res) {
     return addArrOfVecs( [

@@ -98,13 +98,14 @@ function computeSpringForces(spring) {
     var normal = scalXvec(1/length, diff);
     var force = scalXvec(spring.k*(length-spring.d), normal);
     
-    addVec(pa.force, force, pa.force);
+    addVecs(pa.force, force, pa.force);
     var force = scalXvec(-1, force, force);
-    addVec(pb.force, force, pa.force);
+    addVecs(pb.force, force, pa.force);
 }
 
 function computePointForces(point, world) {
     var z = point.pos[2];
+    var anisoFriction = world.anisoFriction;
     
     if (z < 0) {
         point.ground = true;
@@ -124,14 +125,14 @@ function computePointForces(point, world) {
 }
 
 function integratePoint(point, dt) {
-    addVec(point.v, scalXvec(dt/point.m, point.force), point.v);
-    addVec(point.pos, scalXvec(dt, point.v), point.pos);
+    addVecs(point.v, scalXvec(dt/point.m, point.force), point.v);
+    addVecs(point.pos, scalXvec(dt, point.v), point.pos);
     zeroVec3(point.force);
 }
 
 function makeSimWorld(settings) {
     
-    var world = {step: 0};
+    var world = {timestep: 0};
     util.simpleExtend(world, settings);
     world.bodies = [];
     
@@ -152,7 +153,7 @@ function makeSimWorld(settings) {
                 integratePoint(pt);
             }
         });
-        this.step++;
+        this.timestep++;
     };
     
     world.draw = function(camera, screen) {
@@ -170,6 +171,7 @@ function makeSimWorld(settings) {
                 ptB = spr.pb;
                 screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW);
             }
+            
             //Draw grid
             var gridA = makeVec3(0,0,0);
             var gridB = makeVec3(0,0,0);
