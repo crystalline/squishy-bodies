@@ -39,7 +39,7 @@ function makeRingZ(R, N, mass, k) {
     
     points.push(makePoint(makeVec3(0,0,0), mass));
     
-    for (i=0; i<N-1; i++) {
+    for (i=0; i<N; i++) {
         springs.push(makeSpring(points[points.length-1], points[i], R, k));
     }
     
@@ -126,11 +126,94 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
     
     springs = springs.concat(axialSprings);
     
-    var body = {rings: rings, lines: lines, points: points, springs: springs};
+    var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1], lines[2]], rightLines: [lines[5], lines[6]]};
     
     translatePoints(makeVec3(-L*dist/2,0,0), body);
     
     return body;
+}
+
+function actMappingL2(s) {
+    return wormSectionSpacing - s*(wormSectionSpacing-contractionLimit);
+}
+
+var wormColorMap = new Array(256);
+var i;
+for (i=0; i<256; i++) {
+    wormColorMap[i] = 'rgb('+i+',0,'+(256-i)+')';
+}
+
+function scalarColor(s) {
+    return wormColorMap[Math.floor(s*255)];
+}
+
+function muscleContract(muscle, s) {
+    var s = Math.min(1, Math.max(0,s));
+    muscle.spr.l = actMappingL2(s);
+    var color = scalarColor(s);
+    muscle.pa.color = color;
+    muscle.spr.color = color;
+}
+
+function fade(index) {
+    return 1;
+    var fadeStart = Math.floor(wormSections*0.75);
+    if (index > fadeStart) {
+        //index-fadeStart/(wormSections-fadeStart);
+        return 1 + (index-fadeStart)/(fadeStart-wormSections);
+    } else {
+        return 1;
+    }
+}
+
+function wormControllerStep(worm, dt, timestep) {
+    if (timestep > startTime) {
+        worm.leftLines.forEach(function(line) {
+            line.forEach(function(muscle, index) {
+                muscleContract(muscle, (0.5 * fade(index) * Math.sin( index*freq*2*Math.PI/wormSections + 2*Math.PI*(timestep % period)/period )) + 0.5);
+            });
+        });
+        worm.rightLines.forEach(function(line) {
+            line.forEach(function(muscle, index) {
+                muscleContract(muscle, (0.5 * fade(index) * Math.cos( index*freq*2*Math.PI/wormSections + 2*Math.PI*(timestep % period)/period )) + 0.5);
+            });
+        });
+    }
+}
+
+function makeAnimationController(settings) {
+    var ac = {animations:[], freeList:[]};
+    
+    ac.addAnim = function(obj, prop, target, time, ondone) {
+        var anim = {}
+        anim.obj=obj;
+        anim.prop=prop;
+        anim.start=obj[prop];
+        anim.target=target;
+        anim.velocity=(target-obj[prop])/time;
+        anim.ondone=ondone;
+        this.animations.push(anim);
+    };
+    
+    ac.step = function(dt) {
+        var i = 0;
+        this.fps = 1/dt;
+        for (i=this.animations.length-1; i>=0; i--) {
+            var anim = this.animations[i];
+            var propVal = anim.obj[anim.prop];
+            var incremented = propVal + anim.velocity * dt;
+            
+            if (Math.abs(anim.target - incremented) < Math.abs(anim.target - propVal)) {
+                anim.obj[anim.prop] = incremented;
+            } else {
+                anim.obj[anim.prop] = anim.target;
+                if (typeof anim.ondone == "function") { anim.ondone(); }
+                this.animations.splice(i,1);
+            }
+        }        
+    };
+    
+    return ac;
 }
 
 function makeGraphics() {
@@ -227,22 +310,11 @@ function makeGraphics() {
     return graphics;
 }
 
-function addButton(label, onclick) {
-    var dom = document.createElement('a');
-    getbyid('controls').appendChild(dom);
-    dom.className = 'btn';
-    dom.innerHTML = label;
-    if (typeof onclick == 'function') dom.onclick = onclick;
-    return dom;
-}
-
-function getbyid(id) { return document.getElementById(id); }
-
 //Sim parameters
 var worldSettings = {
     surfaceK: 5.0,
     surfaceDrag: 0.28,
-    anisoFriction: false,
+    anisoFriction: true,
     surfaceDragTan: 0.28,
     surfaceDragNorm: 0.01,
     airDrag: 0.01,
@@ -250,7 +322,7 @@ var worldSettings = {
 }
 
 //Controller parameters
-var period = 700;
+var period = 500;
 var startTime = 250;
 var freq = 2.5;
 
@@ -301,7 +373,10 @@ function runWormDemo() {
     
     var cam = {alpha: rad2ang(camera.alpha), beta: rad2ang(camera.beta),
                scale: 0.04, x: 0, y:0, z:0};
-    var config = {pause: false};
+    
+    var config = {pauseSim: false, pauseRender: false};
+    
+    var ac = makeAnimationController();
     
     function camUpdate(value) {
         camera.needUpdate = true;
@@ -311,7 +386,8 @@ function runWormDemo() {
         camera.scale = cam.scale;
     };
     
-    gui.add(config, "pause").onFinishChange(function(val) {if (!val) requestAnimationFrame(draw)});
+    gui.add(config, "pauseRender").onFinishChange(function(val) {});
+    gui.add(config, "pauseSim").onFinishChange(function(val) {});
     gui.add(cam, "alpha", -180, 180).onChange(camUpdate);
     gui.add(cam, "beta", -180, 180).onChange(camUpdate);
     gui.add(cam, "scale").onChange(camUpdate);
@@ -360,22 +436,67 @@ function runWormDemo() {
         py=false;
     }
     
+    //Keyboard event handling
+    function getChar(event) {
+        if (event.which == null) { // IE
+            if (event.keyCode < 32) return null;
+            return String.fromCharCode(event.keyCode);
+        }
+        if (event.which != 0) {
+            if (event.which < 32) return null;
+            return String.fromCharCode(event.which);
+        }
+        return null;
+    }
+    var camMoved = false;
+    var movekeys = {
+        "W":[0,1,0],
+        "S":[0,-1,0],
+        "A":[-1,0,0],
+        "D":[1,0,0]
+    };
+    window.addEventListener("keydown", function(event) {
+        var vec = movekeys[getChar(event)];
+        if (vec && !camera.posUpdate) {
+            var delta = scalXvec(1, addArrOfVecs( [scalXvec(vec[0],camera.planeForward), scalXvec(vec[1],camera.planeRight), scalXvec(vec[2],camera.refTop) ] ));
+            cam.x += delta[1];
+            cam.y += delta[0];
+            cam.z += 0;
+            gui.updateManually();
+            camUpdate();
+        };
+    });
+    window.addEventListener("keyup", function(event) {
+        
+    });
+    
     //Mainloop
     var prevFrameT = Date.now();
+    var simDt = 0.01;
+    timestep = 0;
     
     function draw() {
-        if (!config.pause) requestAnimationFrame(draw);
+        requestAnimationFrame(draw);
         if (camera.needUpdate) { 
             camera.needUpdate = false;
             camera.updateTransform();
         }
-        world.step(0.01);
-        graphics.clear();
-        world.draw(camera, graphics);
+        if (!config.pauseSim) {
+            world.step(simDt);
+            world.step(simDt);
+            world.step(simDt);
+            ac.step(simDt);
+            wormControllerStep(worm, simDt*3, timestep*3);
+        }
+        if (!config.pauseRender) { 
+            graphics.clear();
+            world.draw(camera, graphics);
+        }
         var time = Date.now();
         var frameT = time - prevFrameT;
         graphics.drawText(Math.round(1000/(frameT))+' fps',10,10);
         prevFrameT = time;
+        timestep++;
     }
     
     draw();

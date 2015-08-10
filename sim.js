@@ -23,6 +23,8 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         this.top = applyQuaternionRotation(this.rotRight, this.refTop);
         
         this.forward = crossVecs(this.top, this.right);
+        this.planeForward = normalize(makeVec3(this.forward[0], this.forward[1], 0));
+        this.planeRight = normalize(crossVecs(this.planeForward, this.top));
         
         this.rotation = mulQuats(this.rotRight,this.rotTop);
         
@@ -92,18 +94,27 @@ function computeSpringForces(spring) {
     var length = l2norm(diff);
     var normal = scalXvec(1/length, diff);
     var force = scalXvec(spring.k*(length-spring.l), normal);
-    
     addVecs(pa.force, force, pa.force);
     var force = scalXvec(-1, force, force);
     addVecs(pb.force, force, pb.force);
 }
 
-function computeAnisoFriction(point, world) {
-    
-}
-
 function computeSimpleFriction(point, world) {
     addVecs(point.force, scalXvec(-world.surfaceDrag, point.v), point.force);
+}
+
+function computeAnisoFriction(point, world) {
+    if (point.afpair) {
+        var anormal = normalize(subVecs(point.afpair.pos, point.pos));
+        var vel = point.v;
+        var velNorm = scalXvec(dotVecs(anormal, vel), anormal);
+        var velTan = subVecs(vel, velNorm);
+        //Add friction force to point force accumulator
+        addVecs(scalXvec(-world.surfaceDragTan, velTan), point.force, point.force);
+        addVecs(scalXvec(-world.surfaceDragNorm, velNorm), point.force, point.force);
+    } else {
+        computeSimpleFriction(point, world);
+    }
 }
 
 function computePointForces(point, world) {
@@ -161,19 +172,19 @@ function makeSimWorld(settings) {
     };
     
     world.draw = function(camera, screen) {
-        var ptW = 3, lineW = 1, gridW = 1;
+        var ptW = 3, lineW = 1.5, gridW = 1;
         this.bodies.forEach(function (body) {
             var i, pt, spr, ptA, ptB;
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
                 applyCameraTransform(camera, pt.pos, pt.scrPos);
-                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], ptW);
+                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], ptW, false, pt.color);
             }
             for (i=0; i<body.springs.length; i++) {
                 spr = body.springs[i];
                 ptA = spr.pa;
                 ptB = spr.pb;
-                screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW);
+                screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW, spr.color);
             }
             
             //Draw grid
