@@ -283,3 +283,69 @@ function quaternionToAxisAngle(q, res) {
     return res;
 }
 
+
+//Orthographic camera
+function makeCamera(position, alpha, beta, screenW, screenH, scale) {
+    var camera = {pos: position};
+    
+    camera.refTop = [0,0,1];
+    camera.refRight = [1,0,0];
+    
+    camera.updateTransform = function (alpha, beta, screenW, screenH, scale) {
+        
+        if (util.isNumeric(alpha)) this.alpha = alpha;
+        if (util.isNumeric(beta)) this.beta = beta;
+        if (util.isNumeric(screenW)) this.screenW = screenW;
+        if (util.isNumeric(screenH)) this.screenH = screenH;
+        if (util.isNumeric(scale)) this.scale = scale;
+                
+        this.rotTop = makeQuaternionRotation(this.refTop, -this.alpha);
+        this.rotRight = makeQuaternionRotation(this.refRight, -this.beta);
+        
+        this.right = applyQuaternionRotation(this.rotTop, this.refRight);        
+        this.top = applyQuaternionRotation(this.rotRight, this.refTop);
+        
+        this.forward = crossVecs(this.top, this.right);
+        this.planeForward = normalize(makeVec3(this.forward[0], this.forward[1], 0));
+        this.planeRight = normalize(crossVecs(this.planeForward, this.top));
+        
+        this.rotation = mulQuats(this.rotRight,this.rotTop);
+        
+        var screenScaling = Math.min(this.screenW,this.screenH)*this.scale;
+        
+        this.screenMatrix = makeMatrix(3,3,
+            [screenScaling,0,0,
+             0,screenScaling,0,
+             0,0,screenScaling]);
+
+        this.matrix = matXmat(quaternionToRotMatrix(this.rotation), this.screenMatrix);
+        
+        this.trans = this.pos;
+    };
+    
+    camera.zoom = function(delta) {
+        this.scale *= (delta || 1);
+        this.updateTransform();
+    };
+    
+    camera.moveRel = function (posDelta, alpha, beta) {
+        console.log(this.pos);
+        addVecs(this.pos, posDelta || makeVec3(0,0,0), this.pos);
+        console.log(this.pos);
+        this.alpha += (alpha || 0);
+        this.beta += (beta || 0);
+        this.updateTransform();
+    };
+    
+    camera.updateTransform(alpha, beta, screenW, screenH, scale);
+    
+    return camera;
+}
+
+function applyCameraTransform(camera, vec, res) {
+    res = res || makeVec3(0,0,0);
+    temp = makeVec3(0,0,0);
+    subVecs(vec, camera.trans, temp);
+    matXvec(camera.matrix, temp, res);
+    return res;
+}
