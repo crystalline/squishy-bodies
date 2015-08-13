@@ -17,6 +17,7 @@ function makeSoftBody(points, springs) {
         point.force = makeVec3(0,0,0);
         point.ground = false;
         point.scrPos = makeVec3(0,0,0);
+        point.ppos = makeVec3(point.pos[0], point.pos[1], point.pos[2]);
     });
     return {points: points, springs: springs};
 }
@@ -72,11 +73,21 @@ function computePointForces(point, world) {
     point.force[2] -= world.g * point.mass;
 }
 
-function integratePoint(point, dt) {
+function integratePointEuler(point, dt) {
     addVecs(point.v, scalXvec(dt/point.mass, point.force), point.v);
     addVecs(point.pos, scalXvec(dt, point.v), point.pos);
     zeroVec3(point.force);
 }
+
+function integratePointVerlet(point, dt) {
+   var next = addVecs(subVecs(scalXvec(2, point.pos), point.ppos),
+                      scalXvec(dt*dt/point.mass, point.force));
+   point.ppos = point.pos;
+   point.v = scalXvec(1/dt, subVecs(next, point.pos));
+   point.pos = next;
+   zeroVec3(point.force);
+}
+
 
 function makeSimWorld(settings) {
     
@@ -99,7 +110,7 @@ function makeSimWorld(settings) {
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
                 computePointForces(pt, that);
-                integratePoint(pt, dt);
+                integratePointVerlet(pt, dt);
             }
         });
         this.timestep++;
