@@ -90,7 +90,17 @@ function integratePointVerlet(point, dt) {
 
 function makeSimWorld(settings) {
     
-    var world = {timestep: 0, g: 1, surfaceK: 5};
+    var world = {
+        timestep: 0,
+        g: 1,
+        surfaceK: 5,
+        airDrag: 0.01,
+        anisoFriction: true,
+        surfaceDragTan: 0.28,
+        surfaceDragNorm: 0.01,
+        integrator: integratePointEuler
+    };
+    
     util.simpleExtend(world, settings);
     world.bodies = [];
     
@@ -102,6 +112,7 @@ function makeSimWorld(settings) {
         var that = this;
         this.bodies.forEach(function (body) {
             var i, pt, spr;
+            var pointIntegrator = this.integrator;
             for (i=0; i<body.springs.length; i++) {
                 spr = body.springs[i];
                 computeSpringForces(spr);
