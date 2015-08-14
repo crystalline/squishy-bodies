@@ -1,10 +1,15 @@
 //C-elegans-like worm model contructor
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
-function rotatePoints(axis, phi, body) {
+function rotatePoints(axis, phi, body, origin) {
     var i;
     for (i=0; i<body.points.length; i++) {
-        body.points[i].pos = rotateAxisAngle(axis, phi, body.points[i].pos);
+        if (origin) {
+            body.points[i].pos = addVecs(origin,
+                rotateAxisAngle(axis, phi, subVecs(body.points[i].pos, origin)));
+        } else {
+            body.points[i].pos = rotateAxisAngle(axis, phi, body.points[i].pos);
+        }
     }
     return body;
 }
@@ -301,7 +306,15 @@ function makeGraphics() {
     graphics.drawText = function(text,x,y) {
         this.ctx.save();
         this.ctx.setTransform(2, 0, 0, 2, 0, 0);
-        this.ctx.fillText(text,x,y);
+        if (typeof text == "string") {
+            this.ctx.fillText(text, x, y);
+        }
+        if (typeof text == "object" && text.length) {
+            var i;
+            for (i=0; i<text.length; i++) {
+                this.ctx.fillText(text[i], x, y+i*10);            
+            }
+        }
         this.ctx.restore();
     }
     
@@ -311,6 +324,8 @@ function makeGraphics() {
 }
 
 //Sim parameters
+simDt = 0.01;
+
 var worldSettings = {
     surfaceK: 5.0,
     surfaceDrag: 0.28,
@@ -333,11 +348,11 @@ var Rmid = 1.0;
 //End radius
 var Rend = 0.59;
 
-var wormSections = 31;
-var wormLines = 8;
-var wormSectionSpacing = 1.0
-var wormStiffness = 30;
-var wormPointMass = 0.1;
+wormSections = 31;
+wormLines = 8;
+wormSectionSpacing = 1.0
+wormStiffness = 30;
+wormPointMass = 0.1;
 
 var contractionLimit = 0.7*wormSectionSpacing;
 
@@ -352,6 +367,56 @@ var wormProfile = function(x) {
     }
 };
 
+var importexport = {
+    loadWorld: function () {
+        
+    },
+    saveWorld: function () {
+        
+    }
+};
+
+//Create cube objects for tests
+function makeCube(center, side, mass, stiffness) {
+    center = center || [0,0,0];
+    side = side || 1;
+    mass = mass || 1;
+    stiffness = stiffness || 10;
+    var vertices = [
+        [-0.5,-0.5,-0.5],
+        [0.5,-0.5,-0.5],
+        [-0.5,0.5,-0.5],
+        [0.5,0.5,-0.5],
+        [-0.5,-0.5,0.5],
+        [0.5,-0.5,0.5],
+        [-0.5,0.5,0.5],
+        [0.5,0.5,0.5]
+    ];
+    var points = [], springs = [];
+    vertices.forEach(function(v) {
+        var p = addVecs(scalXvec(side, v), center);
+        points.push(makePoint(p, mass));
+    });
+    var diagonal = Math.sqrt(3)*side;
+    springs.push(makeSpring(points[0], points[1], side, stiffness));
+    springs.push(makeSpring(points[0], points[2], side, stiffness));
+    springs.push(makeSpring(points[3], points[1], side, stiffness));
+    springs.push(makeSpring(points[3], points[2], side, stiffness));
+    springs.push(makeSpring(points[4], points[5], side, stiffness));
+    springs.push(makeSpring(points[4], points[6], side, stiffness));
+    springs.push(makeSpring(points[7], points[5], side, stiffness));
+    springs.push(makeSpring(points[7], points[6], side, stiffness));
+    springs.push(makeSpring(points[0], points[4], side, stiffness));
+    springs.push(makeSpring(points[1], points[5], side, stiffness));
+    springs.push(makeSpring(points[2], points[6], side, stiffness));
+    springs.push(makeSpring(points[3], points[7], side, stiffness));
+    springs.push(makeSpring(points[0], points[7], diagonal, stiffness));
+    springs.push(makeSpring(points[1], points[6], diagonal, stiffness));
+    springs.push(makeSpring(points[2], points[5], diagonal, stiffness));
+    springs.push(makeSpring(points[3], points[4], diagonal, stiffness));
+    return {points: points, springs: springs};
+}
+
 function runWormDemo() {
     console.log("Start");
     
@@ -363,6 +428,15 @@ function runWormDemo() {
     
     camera = makeCamera([0,0,0], Math.PI/4, Math.PI/3, graphics.w, graphics.h, 0.04);
     
+    //var cube = rotatePoints([0,1,0], Math.PI/6, makeCube([0,0,5],2,1,30), [0,0,5]);
+    //world.addSoftBody(makeSoftBody(cube.points, cube.springs));
+    /*
+    var pa = {mass: 1, pos: [1,1,1]};
+    var pb = {mass: 1, pos: [1,0,1]};
+    var spr = {pa: pa, pb: pb, l: 1.2, k: 2};
+    wormSoftBody = makeSoftBody([pa,pb], [spr]);
+    */
+        
     worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
     
     wormSoftBody = makeSoftBody(worm.points, worm.springs);
@@ -374,7 +448,7 @@ function runWormDemo() {
     var cam = {alpha: rad2ang(camera.alpha), beta: rad2ang(camera.beta),
                scale: 0.04, x: 0, y:0, z:0};
     
-    var config = {pauseSim: false, pauseRender: false};
+    var config = {pauseSim: false, pauseRender: false, muscleControl: true};
     
     var ac = makeAnimationController();
     
@@ -386,8 +460,13 @@ function runWormDemo() {
         camera.scale = cam.scale;
     };
     
-    gui.add(config, "pauseRender").onFinishChange(function(val) {});
-    gui.add(config, "pauseSim").onFinishChange(function(val) {});
+    gui.add(config, "pauseRender");
+    gui.add(config, "pauseSim");
+    gui.add(window, "simDt");
+    gui.add(window, "wormStiffness").onFinishChange(function(val) {
+        wormSoftBody.springs.forEach(function(spr) { spr.l = wormStiffness });
+    });
+    gui.add(config, "muscleControl");
     gui.add(cam, "alpha", -180, 180).onChange(camUpdate);
     gui.add(cam, "beta", -180, 180).onChange(camUpdate);
     gui.add(cam, "scale").onChange(camUpdate);
@@ -472,7 +551,6 @@ function runWormDemo() {
     
     //Mainloop
     var prevFrameT = Date.now();
-    var simDt = 0.01;
     timestep = 0;
     
     function draw() {
@@ -484,9 +562,9 @@ function runWormDemo() {
         if (!config.pauseSim) {
             world.step(simDt);
             world.step(simDt);
-            world.step(simDt);
+            world.step(simDt);            
             ac.step(simDt);
-            wormControllerStep(worm, simDt*3, timestep*3);
+            if (config.muscleControl) wormControllerStep(worm, simDt*3, timestep*3);
         }
         if (!config.pauseRender) { 
             graphics.clear();
@@ -494,7 +572,8 @@ function runWormDemo() {
         }
         var time = Date.now();
         var frameT = time - prevFrameT;
-        graphics.drawText(Math.round(1000/(frameT))+' fps',10,10);
+        graphics.drawText([Math.round(1000/(frameT))+' fps',
+                           (Math.round(world.measureEnergy()*10)/10)+ ' energy'], 10, 10);
         prevFrameT = time;
         timestep++;
     }

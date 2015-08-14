@@ -53,19 +53,31 @@ function makeIdentityMat(w,h) {
     return makeMatrix(w,h, function(i,j) { if (i==j) return 1; else return 0; });
 }
 
+function l2normSquare(v) {
+    var i, result = 0;
+    for (i=0; i<v.length; i++) {
+        result += v[i]*v[i];
+    }
+    return result;
+}
+
 function l2norm(v) {
     var i, result = 0;
     for (i=0; i<v.length; i++) {
         result += v[i]*v[i];
     }
-    return Math.sqrt(result);
+    return Math.sqrt(l2normSquare(v));
 }
 
-function distVec3(va, vb) {
+function distSquareVec3(va, vb) {
     var dx = va[0]-vb[0],
         dy = va[1]-vb[1],
         dz = va[2]-vb[2];
-    return Math.sqrt(dx*dx+dy*dy+dz*dz);
+    return dx*dx+dy*dy+dz*dz;
+}
+
+function distVec3(va, vb) {
+    return Math.sqrt(distSquareVec3(va, vb));
 }
 
 function matXvec(mat, vec, res) {

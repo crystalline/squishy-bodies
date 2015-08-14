@@ -88,7 +88,6 @@ function integratePointVerlet(point, dt) {
    zeroVec3(point.force);
 }
 
-
 function makeSimWorld(settings) {
     
     var world = {timestep: 0, g: 1, surfaceK: 5};
@@ -110,14 +109,36 @@ function makeSimWorld(settings) {
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
                 computePointForces(pt, that);
-                integratePointVerlet(pt, dt);
+                integratePointEuler(pt, dt);
             }
         });
         this.timestep++;
     };
     
+    world.measureEnergy = function() {
+        var energy = 0, world = this;
+        this.bodies.forEach(function (body) {
+            var i=0;
+            for (i=0; i<body.points.length; i++) {
+                var pt = body.points[i];
+                var z = pt.pos[2];
+                //Kinetic energy
+                energy += l2normSquare(pt.v)*pt.mass*0.5;
+                //Ground spring energy
+                energy += Math.min(z,0)*z*world.surfaceK*0.5;
+            }
+            for (i=0; i<body.springs.length; i++) {
+                var spr = body.springs[i];
+                //Spring tension energy
+                var delta = spr.l-distVec3(spr.pa.pos, spr.pb.pos);
+                energy += delta*delta*spr.k*0.5;
+            }
+        });
+        return energy;
+    };
+    
     world.draw = function(camera, screen) {
-        var ptW = 3, lineW = 1.5, gridW = 1;
+        var ptW = 5, lineW = 1.5, gridW = 1;
         this.bodies.forEach(function (body) {
             var i, pt, spr, ptA, ptB;
             for (i=0; i<body.points.length; i++) {
