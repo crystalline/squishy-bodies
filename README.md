@@ -18,7 +18,7 @@ world.step(0.01);
 
 ## Demo
 
-The only demo so far is a simulation of C Elegans-like worm built from masses and springs. Lateral springlines are contracted and expanded in a sinusoidal pattern.
+The only demo so far is a simulation of C Elegans-like worm built from masses and springs. Long lines of muscles cells are simulated with springs that have their equilibrium lengths modulated in a sinusoidal pattern by hardcoded controller.
 To run it just load ./wormdemo.html in your browser.
 
 ## Contributors
