@@ -41,6 +41,17 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
     return body;
 }
 
+function wormProfile(x) {
+    var Kl = (Rmid-Rend)/0.5;
+    var Bl = Rend;
+    var Br = Rmid+(Kl/2);
+    if (x<0.5) {
+        return Kl*x+Bl;
+    } else {
+        return -Kl*x+Br;
+    }
+};
+
 function actMappingL2(s) {
     return wormSectionSpacing - s*(wormSectionSpacing-contractionLimit);
 }
@@ -89,9 +100,6 @@ function wormControllerStep(worm, dt, timestep) {
     }
 }
 
-//Sim parameters
-simDt = 0.01;
-
 var worldSettings = {
     surfaceK: 5.0,
     surfaceDrag: 0.28,
@@ -117,25 +125,15 @@ var Rend = 0.59;
 var wormSections = 31;
 var wormLines = 8;
 var wormSectionSpacing = 1.0
-wormStiffness = 30;
+var wormStiffness = 30;
 var wormPointMass = 0.1;
 
 var contractionLimit = 0.7*wormSectionSpacing;
 
-var wormProfile = function(x) {
-    var Kl = (Rmid-Rend)/0.5;
-    var Bl = Rend;
-    var Br = Rmid+(Kl/2);
-    if (x<0.5) {
-        return Kl*x+Bl;
-    } else {
-        return -Kl*x+Br;
-    }
-};
-
 function runWormDemo() {
     var simulation = {}
-    
+
+    window.s = simulation;
     simulation.world = makeSimWorld(worldSettings);
     simulation.worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
     simulation.world.addSoftBody(makeSoftBody(simulation.worm.points, simulation.worm.springs));
@@ -147,6 +145,7 @@ function runWormDemo() {
         gui.add(window, "wormStiffness").onFinishChange(function(val) {
             simConfig.worm.springs.forEach(function(spr) { spr.l = wormStiffness });
         });
+        gui.add(world, "sortPointsByZ");
     };
     
     runSimulationInViewer(simulation);

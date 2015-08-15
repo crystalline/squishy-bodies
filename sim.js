@@ -98,7 +98,12 @@ function makeSimWorld(settings) {
         anisoFriction: true,
         surfaceDragTan: 0.28,
         surfaceDragNorm: 0.01,
-        integrator: integratePointEuler
+        integrator: integratePointEuler,
+        //Graphics parameters
+        sortPointsByZ: true,
+        pointWidth: 5,
+        lineWidth: 2,
+        gridWidth: 1
     };
     
     util.simpleExtend(world, settings);
@@ -148,54 +153,68 @@ function makeSimWorld(settings) {
         return energy;
     };
     
+    function comparePoints(pa, pb) {
+        return pa.scrPos[2] - pb.scrPos[2];
+    }
+    
+    function drawGrid(camera, screen, Ngrid, gStep, gridW) {   
+        var gridA = makeVec3(0,0,0);
+        var gridB = makeVec3(0,0,0);
+        var ptA = makeVec3(0,0,0);
+        var ptB = makeVec3(0,0,0);
+        
+        gridA[0] = -(Ngrid*gStep/2);
+        gridA[1] = -(Ngrid*gStep/2);
+        gridB[0] = -(Ngrid*gStep/2);
+        gridB[1] = (Ngrid*gStep/2);
+        for (i=0; i<=Ngrid; i++) {
+            applyCameraTransform(camera, gridA, ptA);
+            applyCameraTransform(camera, gridB, ptB);
+            screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gridW);
+            gridA[0]+=gStep;
+            gridB[0]+=gStep;
+
+        }
+        
+        gridA[0] = -(Ngrid*gStep/2);
+        gridA[1] = -(Ngrid*gStep/2);
+        gridB[0] = (Ngrid*gStep/2);
+        gridB[1] = -(Ngrid*gStep/2);
+        for (i=0; i<=Ngrid; i++) {
+            applyCameraTransform(camera, gridA, ptA);
+            applyCameraTransform(camera, gridB, ptB);
+            screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gridW);
+            gridA[1]+=gStep;
+            gridB[1]+=gStep;
+        }            
+    }
+    
     world.draw = function(camera, screen) {
-        var ptW = 5, lineW = 1.5, gridW = 1;
+        var ptW = this.pointWidth, lineW = this.lineWidth, gridW = this.gridWidth;
+        var that = this;
         this.bodies.forEach(function (body) {
             var i, pt, spr, ptA, ptB;
+            
             for (i=0; i<body.points.length; i++) {
                 pt = body.points[i];
                 applyCameraTransform(camera, pt.pos, pt.scrPos);
+            }
+            
+            if (that.sortPointsByZ) { body.points.sort(comparePoints); }
+            
+            for (i=0; i<body.points.length; i++) {
+                pt = body.points[i];
                 screen.drawCircle(pt.scrPos[0], pt.scrPos[1], ptW, false, pt.color);
             }
+            
             for (i=0; i<body.springs.length; i++) {
                 spr = body.springs[i];
                 ptA = spr.pa;
                 ptB = spr.pb;
                 screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW, spr.color);
             }
-            
-            //Draw grid
-            var gridA = makeVec3(0,0,0);
-            var gridB = makeVec3(0,0,0);
-            var Ngrid = 10;
-            var gStep = 10;
-            var ptA = makeVec3(0,0,0);
-            var ptB = makeVec3(0,0,0);
-            
-            gridA[0] = -(Ngrid*gStep/2);
-            gridA[1] = -(Ngrid*gStep/2);
-            gridB[0] = -(Ngrid*gStep/2);
-            gridB[1] = (Ngrid*gStep/2);
-            for (i=0; i<=Ngrid; i++) {
-                applyCameraTransform(camera, gridA, ptA);
-                applyCameraTransform(camera, gridB, ptB);
-                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gridW);
-                gridA[0]+=gStep;
-                gridB[0]+=gStep;
-
-            }
-            
-            gridA[0] = -(Ngrid*gStep/2);
-            gridA[1] = -(Ngrid*gStep/2);
-            gridB[0] = (Ngrid*gStep/2);
-            gridB[1] = -(Ngrid*gStep/2);
-            for (i=0; i<=Ngrid; i++) {
-                applyCameraTransform(camera, gridA, ptA);
-                applyCameraTransform(camera, gridB, ptB);
-                screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gridW);
-                gridA[1]+=gStep;
-                gridB[1]+=gStep;
-            }
+                       
+            drawGrid(camera, screen, 10, 10, gridW);
         });
     };
     
