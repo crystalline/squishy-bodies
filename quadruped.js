@@ -1,8 +1,8 @@
-//C-elegans-like worm model constructor
+//Quadruped creature constructor
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
-//L is the number of rings, N is a number of sections per ring R is radius of ring, dist is distance between rings	   
-function makeWormModel(L, N, dist, k, mass, radialProfile) {
+//L is the number of rings, N is a number of sections per ring radialProfile is a function that returns radius of ring given its number, dist is distance between rings	   
+function makeRadialProfile(L, N, dist, k, mass, radialProfile) {
     
     var rings = [];
     var axialSprings = [];
@@ -17,9 +17,7 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
         var ring = makeRingZ(R, N, mass, k);
         points = points.concat(ring.points);
         springs = springs.concat(ring.springs);
-        rings.push(translatePoints(makeVec3(i*dist, 0, 0), rotatePoints(makeVec3(0,1,0), Math.PI/2, ring)));
-        //rings.push(translatePoints(makeVec3(i*dist, 0, 0), ring));
-        //console.log(rings[rings.length-1]);
+        rings.push(translatePoints(makeVec3(0, 0, i*dist), ring));
     }
     
     for (i=0; i<L-1; i++) {
@@ -41,7 +39,7 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
     return body;
 }
 
-function wormProfile(x) {
+function legProfile(x) {
     var Kl = (Rmid-Rend)/0.5;
     var Bl = Rend;
     var Br = Rmid+(Kl/2);
@@ -51,6 +49,20 @@ function wormProfile(x) {
         return -Kl*x+Br;
     }
 };
+
+//config: {origin:, dir:, nsegments:, seglen:, nlines:, stiffness:, pmass: shape:}
+function makeLeg(config) {
+    var shape = config.shape;
+    if (typeof config.shape == 'number') { shape = function (x) { return config.shape; }; }
+    var leg = makeRadialProfile(config.nsegments, config.nlines, config.seglen, config.stiffness, config.pmass, shape);
+    console.log(leg);
+    var dir = normalize(config.dir);
+    var legAxis = [0,0,1];
+    var rotAxis = normalize(crossVecs(legAxis, dir));
+    var rotAngle = Math.acos(dotVecs(legAxis, dir));
+    translatePoints(config.origin, rotatePoints(rotAxis, rotAngle, leg));
+    return leg;
+}
 
 function actMappingL2(s) {
     return wormSectionSpacing - s*(wormSectionSpacing-contractionLimit);
@@ -124,23 +136,29 @@ var Rend = 0.59;
 
 var wormSections = 31;
 var wormLines = 8;
-var wormSectionSpacing = 1.0
+var wormSectionSpacing = 1.0;
 var wormStiffness = 30;
 var wormPointMass = 0.1;
 
 var contractionLimit = 0.7*wormSectionSpacing;
 
-function runWormDemo() {
+function runQuadDemo() {
     var simulation = {}
 
     window.s = simulation;
     simulation.world = makeSimWorld(worldSettings);
-    simulation.worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
-    simulation.world.addSoftBody(makeSoftBody(simulation.worm.points, simulation.worm.springs));
+    
+    simulation.robot = makeLeg({origin: [0,0,0],
+                                dir: [0,1,0],
+                                nsegments: 10,
+                                seglen: 0.2,
+                                nlines: 5,
+                                stiffness: 30,
+                                pmass: 1,
+                                shape: 0.5});
+    
+    simulation.world.addSoftBody(makeSoftBody(simulation.robot.points, simulation.robot.springs));
     simulation.simDt = 0.01;
-    simulation.controller = function(world, dt, nStep, simConfig) {
-        wormControllerStep(simConfig.worm, dt, nStep);
-    };
     simulation.setup = function(world, camera, gui, simConfig) {
         gui.add(window, "wormStiffness").onFinishChange(function(val) {
             simConfig.worm.springs.forEach(function(spr) { spr.l = wormStiffness });
