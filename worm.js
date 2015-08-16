@@ -2,7 +2,7 @@
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 //L is the number of rings, N is a number of sections per ring R is radius of ring, dist is distance between rings	   
-function makeWormModel(L, N, dist, k, mass, radialProfile) {
+function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
     
     var rings = [];
     var axialSprings = [];
@@ -37,6 +37,10 @@ function makeWormModel(L, N, dist, k, mass, radialProfile) {
     var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1], lines[2]], rightLines: [lines[5], lines[6]]};
     
     translatePoints(makeVec3(-L*dist/2,0,0), body);
+    
+    if (pradius) body.points.forEach(function(p) {
+        p.radius = pradius;
+    });
     
     return body;
 }
@@ -101,6 +105,8 @@ function wormControllerStep(worm, dt, timestep) {
 }
 
 var worldSettings = {
+    collisions: true,
+    collisionK: 5,
     surfaceK: 5.0,
     surfaceDrag: 0.28,
     anisoFriction: true,
@@ -127,6 +133,7 @@ var wormLines = 8;
 var wormSectionSpacing = 1.0
 var wormStiffness = 30;
 var wormPointMass = 0.1;
+var wormBallRadius = false;
 
 var contractionLimit = 0.7*wormSectionSpacing;
 
@@ -135,7 +142,7 @@ function runWormDemo() {
 
     window.s = simulation;
     simulation.world = makeSimWorld(worldSettings);
-    simulation.worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile);
+    simulation.worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile, wormBallRadius);
     simulation.world.addSoftBody(makeSoftBody(simulation.worm.points, simulation.worm.springs));
     simulation.simDt = 0.01;
     simulation.controller = function(world, dt, nStep, simConfig) {

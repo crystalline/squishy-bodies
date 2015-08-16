@@ -13,6 +13,14 @@ util = {
         }
         return dst;
     },
+    pushBack: function(dst, src) {
+        var i;
+        var start = dst.length;
+        for (i=0; i<src.length; i++) {
+            dst[start+i] = src[i];
+        }
+        return dst;
+    },
     extend: function() {
         if (arguments.length > 1) {
             var i;

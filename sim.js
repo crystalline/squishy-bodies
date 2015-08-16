@@ -92,6 +92,8 @@ function makeSimWorld(settings) {
     
     var world = {
         timestep: 0,
+        collisions: true,
+        collisionK: 20,
         g: 1,
         surfaceK: 5,
         airDrag: 0.01,
@@ -107,49 +109,76 @@ function makeSimWorld(settings) {
     };
     
     util.simpleExtend(world, settings);
-    world.bodies = [];
     
-    world.addSoftBody = function(body, position, orientation) {
-        this.bodies.push(body);
+    world.points = [];
+    world.springs = [];
+    
+    world.addSoftBody = function(body) {
+        util.pushBack(this.points, body.points);
+        util.pushBack(this.springs, body.springs);
     };
     
     world.step = function(dt) {
-        var that = this;
-        this.bodies.forEach(function (body) {
-            var i, pt, spr;
-            var pointIntegrator = this.integrator;
-            for (i=0; i<body.springs.length; i++) {
-                spr = body.springs[i];
-                computeSpringForces(spr);
+        var i, j, pt, pa, pb, ra, rb, spr;
+        var pointIntegrator = this.integrator;
+        
+        if (this.collisions) {
+            this.penetration = false;
+            var collK = world.collisionK;
+            for (i=0; i<this.points.length; i++) {
+                for (j=0; j<this.points.length; j++) {
+                    pa = this.points[i];
+                    pb = this.points[j];
+                    if (i != j && pa.radius && pb.radius) {
+                        var ra = pa.radius;
+                        var rb = pb.radius;
+                        var diff = subVecs(pb.pos, pa.pos);
+                        var length = l2norm(diff);
+                        var critlen = ra+rb;
+                        var penetration = length-critlen;
+                        
+                        if (penetration<0) {
+                            this.penetration = true;
+                            var normal = scalXvec(1/length, diff);
+                            var force = scalXvec(collK*penetration, normal);
+                            addVecs(pa.force, force, pa.force);
+                            var force = scalXvec(-1, force, force);
+                            addVecs(pb.force, force, pb.force);
+                        }
+                    }
+                }
             }
-            for (i=0; i<body.points.length; i++) {
-                pt = body.points[i];
-                computePointForces(pt, that);
-                integratePointEuler(pt, dt);
-            }
-        });
+        }
+        
+        for (i=0; i<this.springs.length; i++) {
+            spr = this.springs[i];
+            computeSpringForces(spr);
+        }
+        for (i=0; i<this.points.length; i++) {
+            pt = this.points[i];
+            computePointForces(pt, this);
+            pointIntegrator(pt, dt);
+        }
         this.timestep++;
     };
     
     world.measureEnergy = function() {
         var energy = 0, world = this;
-        this.bodies.forEach(function (body) {
-            var i=0;
-            for (i=0; i<body.points.length; i++) {
-                var pt = body.points[i];
-                var z = pt.pos[2];
-                //Kinetic energy
-                energy += l2normSquare(pt.v)*pt.mass*0.5;
-                //Ground spring energy
-                energy += Math.min(z,0)*z*world.surfaceK*0.5;
-            }
-            for (i=0; i<body.springs.length; i++) {
-                var spr = body.springs[i];
-                //Spring tension energy
-                var delta = spr.l-distVec3(spr.pa.pos, spr.pb.pos);
-                energy += delta*delta*spr.k*0.5;
-            }
-        });
+        var i=0;
+        for (i=0; i<this.points.length; i++) {
+            var pt = this.points[i];
+            var z = pt.pos[2];
+            //Kinetic energy
+            energy += l2normSquare(pt.v)*pt.mass*0.5;
+            //Ground spring energy
+            energy += Math.min(z,0)*z*world.surfaceK*0.5;
+        }
+        for (i=0; i<this.springs.length; i++) {
+            var spr = this.springs[i];
+            //Spring tension energy
+            var delta = spr.l-distVec3(spr.pa.pos, spr.pb.pos);
+            energy += delta*delta*spr.k*0.5;
+        }
         return energy;
     };
     
@@ -191,31 +220,30 @@ function makeSimWorld(settings) {
     
     world.draw = function(camera, screen) {
         var ptW = this.pointWidth, lineW = this.lineWidth, gridW = this.gridWidth;
-        var that = this;
-        this.bodies.forEach(function (body) {
-            var i, pt, spr, ptA, ptB;
-            
-            for (i=0; i<body.points.length; i++) {
-                pt = body.points[i];
-                applyCameraTransform(camera, pt.pos, pt.scrPos);
-            }
-            
-            if (that.sortPointsByZ) { body.points.sort(comparePoints); }
-            
-            for (i=0; i<body.points.length; i++) {
-                pt = body.points[i];
-                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], ptW, false, pt.color);
-            }
-            
-            for (i=0; i<body.springs.length; i++) {
-                spr = body.springs[i];
-                ptA = spr.pa;
-                ptB = spr.pb;
-                screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW, spr.color);
-            }
-                       
-            drawGrid(camera, screen, 10, 10, gridW);
-        });
+        var i, pt, width, spr, ptA, ptB;
+        
+        for (i=0; i<this.points.length; i++) {
+            pt = this.points[i];
+            applyCameraTransform(camera, pt.pos, pt.scrPos);
+        }
+        
+        if (this.sortPointsByZ) { this.points.sort(comparePoints); }
+        
+        for (i=0; i<this.points.length; i++) {
+            pt = this.points[i];
+            width = ptW;
+            if (pt.radius) width = camera.screenScaling*pt.radius;
+            screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, false, pt.color);
+        }
+        
+        for (i=0; i<this.springs.length; i++) {
+            spr = this.springs[i];
+            ptA = spr.pa;
+            ptB = spr.pb;
+            screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW, spr.color);
+        }
+                   
+        drawGrid(camera, screen, 10, 10, gridW);
     };
     
     return world;

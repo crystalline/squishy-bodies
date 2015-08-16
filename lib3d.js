@@ -323,12 +323,12 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         
         this.rotation = mulQuats(this.rotRight,this.rotTop);
         
-        var screenScaling = Math.min(this.screenW,this.screenH)*this.scale;
+        this.screenScaling = Math.min(this.screenW,this.screenH)*this.scale;
         
         this.screenMatrix = makeMatrix(3,3,
-            [screenScaling,0,0,
-             0,screenScaling,0,
-             0,0,screenScaling]);
+            [this.screenScaling,0,0,
+             0,this.screenScaling,0,
+             0,0,this.screenScaling]);
 
         this.matrix = matXmat(quaternionToRotMatrix(this.rotation), this.screenMatrix);
         

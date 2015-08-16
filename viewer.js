@@ -285,7 +285,7 @@ function runSimulationInViewer(simConfig) {
             world.step(simDt);            
             ac.step(simDt);
             if (simConfig.postTimestep) {
-                simConfig.preTimestep(world, simDt*3, timestep*3, simConfig);
+                simConfig.postTimestep(world, simDt*3, timestep*3, simConfig);
             }
             if (simConfig.controller && config.controller) {
                 simConfig.controller(world, simDt*3, timestep*3, simConfig);

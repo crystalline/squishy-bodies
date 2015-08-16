@@ -32,9 +32,7 @@ function makeRadialProfile(L, N, dist, k, mass, radialProfile) {
     
     springs = springs.concat(axialSprings);
     
-    var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1], lines[2]], rightLines: [lines[5], lines[6]]};
-    
-    translatePoints(makeVec3(-L*dist/2,0,0), body);
+    var body = {points: points, springs: springs, rings: rings, lines: lines};
     
     return body;
 }
@@ -50,17 +48,20 @@ function legProfile(x) {
     }
 };
 
-//config: {origin:, dir:, nsegments:, seglen:, nlines:, stiffness:, pmass: shape:}
+//config: {origin:, dir:, nsegments:, seglen:, nlines:, stiffness:, pmass:, pradius:, pcolor:, shape:}
 function makeLeg(config) {
     var shape = config.shape;
     if (typeof config.shape == 'number') { shape = function (x) { return config.shape; }; }
     var leg = makeRadialProfile(config.nsegments, config.nlines, config.seglen, config.stiffness, config.pmass, shape);
-    console.log(leg);
     var dir = normalize(config.dir);
     var legAxis = [0,0,1];
     var rotAxis = normalize(crossVecs(legAxis, dir));
     var rotAngle = Math.acos(dotVecs(legAxis, dir));
     translatePoints(config.origin, rotatePoints(rotAxis, rotAngle, leg));
+    leg.points.forEach(function(p) {
+        p.radius = config.pradius;
+        if (config.pcolor) p.col = config.pcolor;
+    });
     return leg;
 }
 
@@ -113,6 +114,8 @@ function wormControllerStep(worm, dt, timestep) {
 }
 
 var worldSettings = {
+    collisions: true,
+    collisionK: 5,
     surfaceK: 5.0,
     surfaceDrag: 0.28,
     anisoFriction: true,
@@ -127,42 +130,29 @@ var period = 500;
 var startTime = 250;
 var freq = 2.5;
 
-//Worm parameters
-
-//Middle radius
-var Rmid = 1.0;
-//End radius
-var Rend = 0.59;
-
-var wormSections = 31;
-var wormLines = 8;
-var wormSectionSpacing = 1.0;
-var wormStiffness = 30;
-var wormPointMass = 0.1;
-
-var contractionLimit = 0.7*wormSectionSpacing;
+var contractionLimit = 0.7;
 
 function runQuadDemo() {
     var simulation = {}
 
     window.s = simulation;
+    
     simulation.world = makeSimWorld(worldSettings);
     
-    simulation.robot = makeLeg({origin: [0,0,0],
-                                dir: [0,1,0],
-                                nsegments: 10,
-                                seglen: 0.2,
-                                nlines: 5,
+    simulation.robot = makeLeg({origin: [0,0,3],
+                                dir: [0,0,1],
+                                nsegments: 6,
+                                seglen: 1.1,
+                                nlines: 8,
                                 stiffness: 30,
                                 pmass: 1,
-                                shape: 0.5});
+                                pradius: 0.5,
+                                shape: 1.2});
     
     simulation.world.addSoftBody(makeSoftBody(simulation.robot.points, simulation.robot.springs));
     simulation.simDt = 0.01;
+    simulation.postTimestep = function(world) { if (world.penetration) { console.log("PENETRATION") } };
     simulation.setup = function(world, camera, gui, simConfig) {
-        gui.add(window, "wormStiffness").onFinishChange(function(val) {
-            simConfig.worm.springs.forEach(function(spr) { spr.l = wormStiffness });
-        });
         gui.add(world, "sortPointsByZ");
     };
     
