@@ -361,3 +361,135 @@ function applyCameraTransform(camera, vec, res) {
     matXvec(camera.matrix, temp, res);
     return res;
 }
+
+/*
+function make3dIndex(cellSide, xsize, ysize, zsize) {
+    var index = {};
+    
+    index.side = cellSide;
+    index.xsize = xsize;
+    index.ysize = ysize;
+    index.zsize = zsize;
+    index.ycoeff = 2*index.xsize;
+    index.zcoeff = 4*index.xsize*index.ysize;
+    index.k = 1/index.side;
+    index.cells = [];
+        
+    index.get = function (cx, cy, cz) {
+        return this.cells[
+    };
+    
+    index.addObject = function(pos, obj) {
+        var x = pos[0];
+        var y = pos[1];
+        var z = pos[2];
+        var cx = Math.floor(x * this.k)+this.xsize;
+        var cy = Math.floor(y * this.k)+this.ysize;
+        var cy = Math.floor(z * this.k)+this.zsize;
+        var i = x+y*
+        if (!index.cells[cx]) { index.cells[cx] = {} };
+        if (!index.cells[cx][cy]) { index.cells[cx][cy] = [] };
+        index.cells[cx][cy].push(ball);
+    };
+    
+    index.mapBallsInRadius = function (x, y, radius, fn) {
+        var cx = Math.floor(x * index.k);
+        var cy = Math.floor(y * index.k);
+        var cr = Math.ceil(radius * index.k);
+        var result = [];
+        var i,j,k;
+        var balls;
+        for (i=-cr; i<=cr; i++) {
+            for (j=-cr; j<=cr; j++) {
+                balls = this.get(cx+i, cy+j);
+                for (k=0; k<balls.length; k++) {
+                    fn(balls[k]);
+                }
+            }
+        }
+        return result;
+    };
+    
+    index.getBallStat = function() {
+        
+    };
+    
+    return index;
+}
+
+function L2square(x1,y1,x2,y2) {
+    var dx = x1-x2;
+    var dy = y1-y2;
+    return dx*dx+dy*dy
+}
+
+
+function test2dIndex() {
+    var N = 150000;
+    var L = 1.5;
+    var w = 100;
+    var h = 100;
+    var side = 1.1;
+    var balls = [];
+    var i,j;
+    var random = Math.random;
+    
+    var index = make2dIndex(side);
+    
+    for (i=0; i<N; i++) {
+        var ball = {x: random()*w, y: random()*h};
+        balls.push(ball);
+        index.addBall(ball);
+    }
+    
+    var x = random()*w;
+    var y = random()*h;
+    
+    console.log('x = '+x);
+    console.log('y = '+y);
+    
+    var t1 = Date.now();
+    
+    var ballsTest = [];
+    
+    console.log(balls.length);
+    
+    for (j=0; j<balls.length; j++) {
+        var ball = balls[j];
+        if (L2square(x, y, ball.x, ball.y) < L*L) {
+            ballsTest.push(ball);
+        }
+    }
+    
+    var t2 = Date.now();
+    
+    var result = [];
+
+    index.mapBallsInRadius(x, y, L, function(ball) {
+        if (L2square(x, y, ball.x, ball.y) < L*L) {
+            result.push(ball);
+        }
+    });
+    
+    var t3 = Date.now();
+    
+    var order = function(a,b) { if (a.x > b.x) { return 1 } else { return -1 } };
+    result.sort(order);
+    ballsTest.sort(order);
+            
+    var fail = false;
+    
+    if (result.length != ballsTest.length) { console.log('Index test failed: length difference '+result.length+' '+ballsTest.length); fail = true; return };
+    
+    for (i=0; i<Math.max(result.length, ballsTest.length); i++) {
+        if (result[i].x != ballsTest[i].x || result[i].y != ballsTest[i].y) {
+            console.log('Index test failed at '+i); fail = true;
+        }
+    }
+    
+    if (!fail) { console.log('Index2d tests passed, time \nreference:'+((t2-t1)/1000)+'\nindexed:'+((t3-t2)/1000)); }
+}
+
+test2dIndex();
+
+*/

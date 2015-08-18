@@ -158,7 +158,6 @@ function runSimulationInViewer(simConfig) {
     graphics.drawCircle( 0, 0, 1, false, "#FF00FF");
     
     var world = simConfig.world;
-    var simDt = simConfig.simDt;
     
     var camera = makeCamera([0,0,0], Math.PI/4, Math.PI/3, graphics.w, graphics.h, 0.04);  
     
@@ -252,7 +251,8 @@ function runSimulationInViewer(simConfig) {
         "D":[1,0,0]
     };
     window.addEventListener("keydown", function(event) {
-        var vec = movekeys[getChar(event)];
+        var char = getChar(event);
+        var vec = movekeys[char];
         if (vec && !camera.posUpdate) {
             var delta = scalXvec(1, addArrOfVecs( [scalXvec(vec[0],camera.planeForward), scalXvec(vec[1],camera.planeRight), scalXvec(vec[2],camera.refTop) ] ));
             cam.x += delta[1];
@@ -261,6 +261,10 @@ function runSimulationInViewer(simConfig) {
             gui.updateManually();
             camUpdate();
         };
+        if (char == " ") {
+            config.pauseSim = !config.pauseSim;
+            gui.updateManually();
+        }
     });
     window.addEventListener("keyup", function(event) {
         
@@ -277,18 +281,18 @@ function runSimulationInViewer(simConfig) {
             camera.updateTransform();
         }
         if (!config.pauseSim) {
+            var simDt = simConfig.simDt;
+            var totalStep = simDt;
             if (simConfig.preTimestep) {
-                simConfig.preTimestep(world, simDt*3, timestep*3, simConfig);
+                simConfig.preTimestep(world, totalStep, timestep*(totalStep/simDt), simConfig);
             }
-            world.step(simDt);
-            world.step(simDt);
-            world.step(simDt);            
+            world.step(simDt);        
             ac.step(simDt);
             if (simConfig.postTimestep) {
-                simConfig.postTimestep(world, simDt*3, timestep*3, simConfig);
+                simConfig.postTimestep(world, totalStep, timestep*(totalStep/simDt), simConfig);
             }
             if (simConfig.controller && config.controller) {
-                simConfig.controller(world, simDt*3, timestep*3, simConfig);
+                simConfig.controller(world, totalStep, timestep*(totalStep/simDt), simConfig);
             }
         }
         if (!config.pauseRender) { 
@@ -297,8 +301,10 @@ function runSimulationInViewer(simConfig) {
         }
         var time = Date.now();
         var frameT = time - prevFrameT;
-        graphics.drawText([Math.round(1000/(frameT))+' fps',
-                           (Math.round(world.measureEnergy()*10)/10)+ ' energy'], 10, 10);
+        var stats = [Math.round(1000/(frameT))+' fps',
+                     (Math.round(world.measureEnergy()*10)/10)+ ' energy'];
+        if (world.collTime) stats.push( 'collision '+(world.collTime)+' ms' );
+        graphics.drawText(stats, 10, 10);
         prevFrameT = time;
         timestep++;
     }

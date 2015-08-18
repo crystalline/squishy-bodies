@@ -1,4 +1,4 @@
-//C-elegans-like worm model constructor
+2//C-elegans-like worm model constructor
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 //L is the number of rings, N is a number of sections per ring R is radius of ring, dist is distance between rings	   
@@ -34,9 +34,11 @@ function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
     
     springs = springs.concat(axialSprings);
     
-    var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1], lines[2]], rightLines: [lines[5], lines[6]]};
+    //var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1], lines[2]], rightLines: [lines[5], lines[6]]};
     
-    translatePoints(makeVec3(-L*dist/2,0,0), body);
+    var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[2]], rightLines: [lines[5]]};
+    
+    translatePoints(makeVec3(-L*dist/2,0,2), body);
     
     if (pradius) body.points.forEach(function(p) {
         p.radius = pradius;
@@ -112,7 +114,7 @@ var worldSettings = {
     anisoFriction: true,
     surfaceDragTan: 0.28,
     surfaceDragNorm: 0.01,
-    airDrag: 0.01,
+    airDrag: 0.1,
     g: 1.0
 }
 
@@ -124,18 +126,18 @@ var freq = 2.5;
 //Worm parameters
 
 //Middle radius
-var Rmid = 1.0;
+var Rmid = 1.6;
 //End radius
-var Rend = 0.59;
+var Rend = 1.2;
 
 var wormSections = 31;
-var wormLines = 8;
-var wormSectionSpacing = 1.0
+var wormLines = 6;
+var wormSectionSpacing = 1.2;
 var wormStiffness = 30;
 var wormPointMass = 0.1;
-var wormBallRadius = false;
+var wormBallRadius = 0.5;
 
-var contractionLimit = 0.7*wormSectionSpacing;
+var contractionLimit = 0.9*wormSectionSpacing;
 
 function runWormDemo() {
     var simulation = {}

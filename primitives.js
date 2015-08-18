@@ -59,7 +59,7 @@ function getRingRadius(ring) {
 
 //Returns list of springs and muscles
 //Sets anisotropic friction pairs
-function linkRings(A, B, dist, k) {
+function linkRings(A, B, dist, k, noCrossLink) {
     if (A.points.length == B.points.length) {
         var springs = [];
         var muscles = [];
@@ -81,7 +81,7 @@ function linkRings(A, B, dist, k) {
             }
         }
         
-        for (i=0; i<A.points.length-1; i++) {
+        if (!noCrossLink) for (i=0; i<A.points.length-1; i++) {
             var spA = makeSpring(A.points[A.points.length-1], B.points[i], diagonalA, k);
             var spB = makeSpring(A.points[i], B.points[B.points.length-1], diagonalB, k); 
             springs.push(spA);
