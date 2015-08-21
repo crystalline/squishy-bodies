@@ -362,91 +362,112 @@ function applyCameraTransform(camera, vec, res) {
     return res;
 }
 
-/*
-function make3dIndex(cellSide, xsize, ysize, zsize) {
+function make3dIndex(cellSide, xsize, ysize) {
     var index = {};
     
     index.side = cellSide;
     index.xsize = xsize;
     index.ysize = ysize;
-    index.zsize = zsize;
     index.ycoeff = 2*index.xsize;
     index.zcoeff = 4*index.xsize*index.ysize;
     index.k = 1/index.side;
-    index.cells = [];
+    index.cells = {};
+    index.neighborhood = [
+        [0,0,0],
+        [0,0,1],
+        [1,0,1],
+        [-1,0,1],
+        [0,1,1],
+        [0,-1,1],
+        [1,1,1],
+        [1,-1,1],
+        [-1,1,1],
+        [-1,-1,1],
+        [1,0,0],
+        [-1,0,0],
+        [0,1,0],
+        [0,-1,0],
+        [1,1,0],
+        [1,-1,0],
+        [-1,1,0],
+        [-1,-1,0],
+        [0,0,-1],
+        [1,0,-1],
+        [-1,0,-1],
+        [0,1,-1],
+        [0,-1,-1],
+        [1,1,-1],
+        [1,-1,-1],
+        [-1,1,-1],
+        [-1,-1,-1]
+    ];
         
-    index.get = function (cx, cy, cz) {
-        return this.cells[
-    };
-    
     index.addObject = function(pos, obj) {
         var x = pos[0];
         var y = pos[1];
         var z = pos[2];
         var cx = Math.floor(x * this.k)+this.xsize;
         var cy = Math.floor(y * this.k)+this.ysize;
-        var cy = Math.floor(z * this.k)+this.zsize;
-        var i = x+y*
-        if (!index.cells[cx]) { index.cells[cx] = {} };
-        if (!index.cells[cx][cy]) { index.cells[cx][cy] = [] };
-        index.cells[cx][cy].push(ball);
+        var cz = Math.floor(z * this.k);
+        var i = cx+cy*this.ycoeff+cz*this.zcoeff;
+        if (!this.cells[i]) this.cells[i] = [obj];
+        else this.cells[i].push(obj);
     };
     
-    index.mapBallsInRadius = function (x, y, radius, fn) {
-        var cx = Math.floor(x * index.k);
-        var cy = Math.floor(y * index.k);
-        var cr = Math.ceil(radius * index.k);
+    index.mapObjectsInRadius = function (x, y, z, fn) {
+        var cx = Math.floor(x * this.k)+this.xsize;
+        var cy = Math.floor(y * this.k)+this.ysize;
+        var cz = Math.floor(z * this.k);
         var result = [];
-        var i,j,k;
-        var balls;
-        for (i=-cr; i<=cr; i++) {
-            for (j=-cr; j<=cr; j++) {
-                balls = this.get(cx+i, cy+j);
-                for (k=0; k<balls.length; k++) {
-                    fn(balls[k]);
+        var i, k, index, objects, dx, dy, dz;
+        var near = this.neighborhood;
+        
+        for (i=0; i<near.length; i++) {
+            dx = near[i][0];
+            dy = near[i][1];
+            dz = near[i][2];
+            index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
+            objects = this.cells[index];
+            if (objects) {
+                for (k=0; k<objects.length; k++) {
+                    fn(objects[k]);
                 }
             }
         }
-        return result;
     };
     
-    index.getBallStat = function() {
+    index.getStats = function() {
         
     };
     
     return index;
 }
 
-function L2square(x1,y1,x2,y2) {
-    var dx = x1-x2;
-    var dy = y1-y2;
-    return dx*dx+dy*dy
-}
-
-
-function test2dIndex() {
-    var N = 150000;
-    var L = 1.5;
+function test3dIndex() {
+    var N = 1000000;
+    var L = 1.0;
     var w = 100;
     var h = 100;
+    var d = 100;
     var side = 1.1;
     var balls = [];
     var i,j;
     var random = Math.random;
     
-    var index = make2dIndex(side);
+    var index = make3dIndex(side, w+2, h+2);
     
     for (i=0; i<N; i++) {
-        var ball = {x: random()*w, y: random()*h};
+        var ball = {pos: [random()*w, random()*h, random()*d]}
         balls.push(ball);
-        index.addBall(ball);
+        index.addObject(ball.pos, ball);
     }
     
     var x = random()*w;
     var y = random()*h;
+    var z = random()*d;
     
-    console.log('x = '+x);
-    console.log('y = '+y);
+    var center = [x,y,z];
+    console.log('center = '+center);
     
     var t1 = Date.now();
     
@@ -456,7 +477,7 @@ function test2dIndex() {
     
     for (j=0; j<balls.length; j++) {
         var ball = balls[j];
-        if (L2square(x, y, ball.x, ball.y) < L*L) {
+        if (distSquareVec3(ball.pos, center) < L*L) {
             ballsTest.push(ball);
         }
     }
@@ -465,8 +486,8 @@ function test2dIndex() {
     
     var result = [];
 
-    index.mapBallsInRadius(x, y, L, function(ball) {
-        if (L2square(x, y, ball.x, ball.y) < L*L) {
+    index.mapObjectsInRadius(center[0], center[1], center[2], function(ball) {
+        if (distSquareVec3(ball.pos, center) < L*L) {
             result.push(ball);
         }
     });
@@ -487,9 +508,6 @@ function test2dIndex() {
         }
     }
     
-    if (!fail) { console.log('Index2d tests passed, time \nreference:'+((t2-t1)/1000)+'\nindexed:'+((t3-t2)/1000)); }
+    if (!fail) { console.log('Index3d tests passed, time \nreference:'+((t2-t1)/1000)+'\nindexed:'+((t3-t2)/1000)); }
 }
 
-test2dIndex();
-
-*/

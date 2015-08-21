@@ -105,6 +105,7 @@ function makeSimWorld(settings) {
     var world = {
         timestep: 0,
         collisions: true,
+        collisionIndex: true,
         collisionK: 30,
         gridStep: 1.1,
         g: 1,
@@ -126,9 +127,6 @@ function makeSimWorld(settings) {
     world.points = [];
     world.springs = [];
     
-    //Collision grid
-    world.grid = []
-    
     world.addSoftBody = function(body) {
         util.pushBack(this.points, body.points);
         util.pushBack(this.springs, body.springs);
@@ -144,46 +142,71 @@ function makeSimWorld(settings) {
         }
         
         if (this.collisions) {
+            
+            var index3d;
+            if (this.collisionIndex) {
+                index3d = make3dIndex(1.1,100,100,100);
+                for (i=0; i<this.points.length; i++) {
+                    var p = this.points[i];
+                    index3d.addObject(p.pos, p);
+                }
+            }
+            
             util.arrayShuffle(this.points);
             var collStartT = Date.now();
             var collK = world.collisionK;
-            for (i=0; i<this.points.length; i++) {
-                for (j=0; j<this.points.length; j++) {
-                    pa = this.points[i];
-                    pb = this.points[j];
-                    if (i != j && pa.radius && pb.radius) {
-                        var ra = pa.radius;
-                        var rb = pb.radius;
-                        var diff = subVecs(pb.pos, pa.pos);
-                        var length = l2norm(diff);
-                        var critlen = ra+rb;
-                        var penetration = length-critlen;
+            
+            function computeCollision(pa, pb) {
+                if (pa != pb && pa.radius && pb.radius) {
+                    var ra = pa.radius;
+                    var rb = pb.radius;
+                    var diff = subVecs(pb.pos, pa.pos);
+                    var length = l2norm(diff);
+                    var critlen = ra+rb;
+                    var penetration = length-critlen;
+                    
+                    if (penetration<0) {
                         
-                        if (penetration<0) {
-                            
-                            var normal = scalXvec(1/length, diff);
-                            
-                            if (window.collisionForce) {                                
-                                var force = scalXvec(collK*penetration, normal);
-                                addVecs(pa.force, force, pa.force);
-                                var force = scalXvec(-1, force, force);
-                                addVecs(pb.force, force, pb.force);
-                            } else {
-                                if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal), pb.pos);
-                                if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal), pa.pos);                    
-                            }
-                            
-                            /*
-                            var ma = pa.mass;
-                            var mb = pb.mass;
-                            var J = -(1+0.3)*dotVecs(subVecs(pa.v, pb.v), normal)/((1/ma+1/mb));
-                            addVecs(pa.v, scalXvec(J/ma, normal), pa.v);
-                            addVecs(pb.v, scalXvec(J/mb, normal), pb.v);
-                            */
+                        var normal = scalXvec(1/length, diff);
+                        
+                        if (window.collisionForce) {                                
+                            var force = scalXvec(collK*penetration, normal);
+                            addVecs(pa.force, force, pa.force);
+                            var force = scalXvec(-1, force, force);
+                            addVecs(pb.force, force, pb.force);
+                        } else {
+                            if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal), pb.pos);
+                            if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal), pa.pos);                    
                         }
+                        
+                        /*
+                        var ma = pa.mass;
+                        var mb = pb.mass;
+                        var J = -(1+0.3)*dotVecs(subVecs(pa.v, pb.v), normal)/((1/ma+1/mb));
+                        addVecs(pa.v, scalXvec(J/ma, normal), pa.v);
+                        addVecs(pb.v, scalXvec(J/mb, normal), pb.v);
+                        */
                     }
                 }
             }
+            
+            if (this.collisionIndex) {
+                for (i=0; i<this.points.length; i++) {
+                    pa = this.points[i];
+                    index3d.mapObjectsInRadius(pa.pos[0], pa.pos[1], pa.pos[2], function(pb) {
+                        computeCollision(pa, pb);
+                    });
+                }
+            } else {
+                for (i=0; i<this.points.length; i++) {
+                    pa = this.points[i];
+                    for (j=0; j<this.points.length; j++) {
+                        pb = this.points[j];
+                        computeCollision(pa, pb);
+                    }
+                }
+            }            
+            
             this.collTime = Date.now() - collStartT;
         }
         
