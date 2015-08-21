@@ -42,17 +42,6 @@ function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin) {
     return body;
 }
 
-function legProfile(x) {
-    var Kl = (Rmid-Rend)/0.5;
-    var Bl = Rend;
-    var Br = Rmid+(Kl/2);
-    if (x<0.5) {
-        return Kl*x+Bl;
-    } else {
-        return -Kl*x+Br;
-    }
-};
-
 //config: {origin:, dir:, alpha:, nsegments:, seglen:, nlines:, stiffness:,
 //         pmass:, pradius:, pcolor:, shape:, fixorigin:}
 function makeLeg(config) {
@@ -105,19 +94,87 @@ function fade(index) {
     }
 }
 
-function wormControllerStep(worm, dt, timestep) {
-    if (timestep > startTime) {
-        worm.leftLines.forEach(function(line) {
-            line.forEach(function(muscle, index) {
-                muscleContract(muscle, (0.5 * fade(index) * Math.sin( index*freq*2*Math.PI/wormSections + 2*Math.PI*(timestep % period)/period )) + 0.5);
-            });
-        });
-        worm.rightLines.forEach(function(line) {
-            line.forEach(function(muscle, index) {
-                muscleContract(muscle, (0.5 * fade(index) * Math.cos( index*freq*2*Math.PI/wormSections + 2*Math.PI*(timestep % period)/period )) + 0.5);
-            });
-        });
-    }
+function makeFallingStrutsWorld() {
+    var world = makeSimWorld(worldSettings);
+    
+    var leg1 = makeLeg({origin: [-1,0,6],
+                        dir: [0,0,1],
+                        nsegments: 16,
+                        seglen: 1.1,
+                        nlines: 6,
+                        stiffness: 30,
+                        pmass: 1,
+                        pradius: 0.5,
+                        shape: 1.3});
+    
+    var leg2 = makeLeg({origin: [-1,-6,6],
+                        dir: [0,0.2,1],
+                        nsegments: 16,
+                        seglen: 1.1,
+                        nlines: 6,
+                        stiffness: 30,
+                        pmass: 1,
+                        pradius: 0.5,
+                        shape: 1.3});
+          
+    var leg3 = makeLeg({origin: [0,-8,1.5],
+                        dir: [0,1,0],
+                        nsegments: 16,
+                        seglen: 1.1,
+                        nlines: 6,
+                        stiffness: 30,
+                        pmass: 1,
+                        pradius: 0.5,
+                        shape: 1.3});
+    
+    world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
+    world.addSoftBody(makeSoftBody(leg2.points, leg2.springs));
+    world.addSoftBody(makeSoftBody(leg3.points, leg3.springs));
+    return world;
+}
+
+function makeMomentumConservationTestWorld() {
+    var world = makeSimWorld(worldSettings);
+    var leg1 = makeLeg({origin: [0,0,3],
+                        dir: [0,0,1],
+                        nsegments: 6,
+                        seglen: 0.9,
+                        nlines: 8,
+                        stiffness: 30,
+                        pmass: 1,
+                        pradius: 0.5,
+                        shape: 1.2});
+           
+    var leg2 = makeLeg({origin: [0,-3,0],
+                        dir: [0,1,0],
+                        nsegments: 10,
+                        seglen: 1.1,
+                        nlines: 2,
+                        stiffness: 30,
+                        pmass: 1,
+                        pradius: 0.5,
+                        shape: 1.5});
+    
+    world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
+    world.addSoftBody(makeSoftBody(leg2.points, leg2.springs));
+    return world;
+}
+
+function makeRigidityTestWorld() {
+    var world = makeSimWorld(worldSettings);
+    var leg1 = makeLeg({origin: [-3,0,8],
+                        dir: [0,1,1],
+                        alpha: Math.PI/10,
+                        nsegments: 30,
+                        seglen: 1.1,
+                        nlines: 5,
+                        stiffness: 30,
+                        pmass: 1,
+                        pradius: 0.5,
+                        shape: function(x) { return x < 0.5 ? 1.0+(0.5-x) : 1.0 },
+                        fixorigin: true});
+    world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
+    return world;
 }
 
 var worldSettings = {
@@ -129,84 +186,16 @@ var worldSettings = {
     surfaceDragTan: 0.28,
     surfaceDragNorm: 0.01,
     airDrag: 0.2,
-    g: 1.0
+    g: 1.0,
+    sortPointsByZ: 0
 }
-
-//Controller parameters
-var period = 500;
-var startTime = 250;
-var freq = 2.5;
-
-var contractionLimit = 0.7;
 
 function runQuadDemo() {
     var simulation = {}
 
     window.s = simulation;
     
-    simulation.world = makeSimWorld(worldSettings);
-    
-    /*
-    var leg1 = makeLeg({origin: [0,0,3],
-                        dir: [0,0,1],
-                        nsegments: 6,
-                        seglen: 0.9,
-                        nlines: 8,
-                        stiffness: 30,
-                        pmass: 1,
-                        pradius: 0.5,
-                        shape: 1.2});
-    
-    simulation.world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
-       
-    var leg2 = makeLeg({origin: [0,-3,0],
-                        dir: [0,1,0],
-                        nsegments: 10,
-                        seglen: 1.1,
-                        nlines: 2,
-                        stiffness: 30,
-                        pmass: 1,
-                        pradius: 0.5,
-                        shape: 1.5});
-    
-    simulation.world.addSoftBody(makeSoftBody(leg2.points, leg2.springs));
-    */
-    
-    var leg1 = makeLeg({origin: [-1,0,6],
-                        dir: [0,0,1],
-                        nsegments: 6,
-                        seglen: 1.1,
-                        nlines: 6,
-                        stiffness: 30,
-                        pmass: 1,
-                        pradius: 0.5,
-                        shape: 1.3});
-    
-    simulation.world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
-       
-    var leg2 = makeLeg({origin: [0,-3,1.5],
-                        dir: [0,1,0],
-                        nsegments: 10,
-                        seglen: 1.1,
-                        nlines: 6,
-                        stiffness: 30,
-                        pmass: 1,
-                        pradius: 0.5,
-                        shape: 1.3});
-    
-    simulation.world.addSoftBody(makeSoftBody(leg2.points, leg2.springs));
-    
-    var leg3 = makeLeg({origin: [-3,0,8],
-                    dir: [0,1,1],
-                    alpha: Math.PI/10,
-                    nsegments: 30,
-                    seglen: 1.1,
-                    nlines: 5,
-                    stiffness: 30,
-                    pmass: 1,
-                    pradius: 0.5,
-                    shape: function(x) { return x < 0.5 ? 1.0+(0.5-x) : 1.0 },
-                    fixorigin: true});
+    simulation.world = makeFallingStrutsWorld();
     
     simulation.simDt = 0.03;
     simulation.setup = function(world, camera, gui, simConfig) {

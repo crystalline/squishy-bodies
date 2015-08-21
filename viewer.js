@@ -269,10 +269,17 @@ function runSimulationInViewer(simConfig) {
     window.addEventListener("keyup", function(event) {
         
     });
+    window.addEventListener("mousewheel", function(event) {
+        var rotation = -event.deltaY/window.innerHeight;
+        cam.scale *= (1+rotation);
+        gui.updateManually();
+        camUpdate();
+    });
     
     //Mainloop
     var prevFrameT = Date.now();
     var timestep = 0;
+    var frameCount = 0;
     
     function draw() {
         requestAnimationFrame(draw);
@@ -303,10 +310,12 @@ function runSimulationInViewer(simConfig) {
         var frameT = time - prevFrameT;
         var stats = [Math.round(1000/(frameT))+' fps',
                      (Math.round(world.measureEnergy()*10)/10)+ ' energy'];
-        if (world.collTime) stats.push( 'collision '+(world.collTime)+' ms' );
+        if (util.isNumeric(world.collTime)) stats.push( 'collision '+(world.collTime)+' ms' );
+        stats.push(world.points.length+' atoms '+world.springs.length+' bonds');
         graphics.drawText(stats, 10, 10);
         prevFrameT = time;
         timestep++;
+        frameCount++;
     }
     
     if (simConfig.setup) {

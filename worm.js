@@ -14,7 +14,7 @@ function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
     
     for (i=0; i<L; i++) {
         var R = radialProfile(i/L);
-        var ring = makeRingZ(R, N, mass, k);
+        var ring = makeRingZ(R, N, mass, k, Math.PI/6);
         points = points.concat(ring.points);
         springs = springs.concat(ring.springs);
         rings.push(translatePoints(makeVec3(i*dist, 0, 0), rotatePoints(makeVec3(0,1,0), Math.PI/2, ring)));
@@ -36,7 +36,7 @@ function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
     
     //var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1], lines[2]], rightLines: [lines[5], lines[6]]};
     
-    var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[2]], rightLines: [lines[5]]};
+    var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1]], rightLines: [lines[4]]};
     
     translatePoints(makeVec3(-L*dist/2,0,2), body);
     
@@ -107,19 +107,20 @@ function wormControllerStep(worm, dt, timestep) {
 }
 
 var worldSettings = {
-    collisions: true,
+    collisions: false,
     collisionK: 5,
     surfaceK: 5.0,
     surfaceDrag: 0.28,
     anisoFriction: true,
     surfaceDragTan: 0.28,
     surfaceDragNorm: 0.01,
-    airDrag: 0.1,
-    g: 1.0
+    airDrag: 0.01,
+    g: 1.0,
+    springsHooke: true
 }
 
 //Controller parameters
-var period = 500;
+var period = 300;
 var startTime = 250;
 var freq = 2.5;
 
@@ -128,7 +129,7 @@ var freq = 2.5;
 //Middle radius
 var Rmid = 1.6;
 //End radius
-var Rend = 1.2;
+var Rend = 1.0;
 
 var wormSections = 31;
 var wormLines = 6;
@@ -137,7 +138,7 @@ var wormStiffness = 30;
 var wormPointMass = 0.1;
 var wormBallRadius = 0.5;
 
-var contractionLimit = 0.9*wormSectionSpacing;
+var contractionLimit = 0.5*wormSectionSpacing;
 
 function runWormDemo() {
     var simulation = {}
@@ -146,7 +147,7 @@ function runWormDemo() {
     simulation.world = makeSimWorld(worldSettings);
     simulation.worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile, wormBallRadius);
     simulation.world.addSoftBody(makeSoftBody(simulation.worm.points, simulation.worm.springs));
-    simulation.simDt = 0.01;
+    simulation.simDt = 0.03;
     simulation.controller = function(world, dt, nStep, simConfig) {
         wormControllerStep(simConfig.worm, dt, nStep);
     };

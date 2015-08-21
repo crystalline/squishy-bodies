@@ -23,7 +23,8 @@ function translatePoints(vec, body) {
 }
 
 //Make ring of point masses connected with springs, last point is central
-function makeRingZ(R, N, mass, k) {
+function makeRingZ(R, N, mass, k, phi0) {
+    phi0 = phi0 || 0;
     var points = [];
     var springs = [];
     var phi = 2*Math.PI/N;
@@ -33,7 +34,7 @@ function makeRingZ(R, N, mass, k) {
     var i;
     
     for (i=0; i<N; i++) {
-        points.push(makePoint(rotateAxisAngle(axis, phi*i, rvec), mass));
+        points.push(makePoint(rotateAxisAngle(axis, phi0+phi*i, rvec), mass));
     }
     
     for (i=0; i<N-1; i++) {

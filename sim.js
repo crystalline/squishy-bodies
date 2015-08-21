@@ -25,22 +25,28 @@ function makeSoftBody(points, springs) {
 window.springsForce = false;
 window.collisionForce = false;
 
-function computeSpringForces(spring) {
+function penaltyForceSolver(spring) {
+    var pa = spring.pa;
+    var pb = spring.pb;
+    var diff = subVecs(pb.pos, pa.pos);
+    var length = l2norm(diff);
+    var normal = scalXvec(1/length, diff);
+  
+    var force = scalXvec(spring.k*(length-spring.l), normal);
+    addVecs(pa.force, force, pa.force);
+    var force = scalXvec(-1, force, force);
+    addVecs(pb.force, force, pb.force);
+}
+
+function positionConstraintSolver(spring) {
     var pa = spring.pa;
     var pb = spring.pb;
     var diff = subVecs(pb.pos, pa.pos);
     var length = l2norm(diff);
     var normal = scalXvec(1/length, diff);
     
-    if (window.springsForce) {
-        var force = scalXvec(spring.k*(length-spring.l), normal);
-        addVecs(pa.force, force, pa.force);
-        var force = scalXvec(-1, force, force);
-        addVecs(pb.force, force, pb.force);    
-    } else if (Math.random() > 0.1) {
-        if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*(length-spring.l), normal), pb.pos);
-        if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*(length-spring.l), normal), pa.pos);
-    }
+    if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*(length-spring.l), normal), pb.pos);
+    if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*(length-spring.l), normal), pa.pos);
 }
 
 function computeSimpleFriction(point, world) {
@@ -102,6 +108,7 @@ function integratePointVerlet(point, dt) {
 
 function makeSimWorld(settings) {
     
+    //Default settings
     var world = {
         timestep: 0,
         collisions: true,
@@ -136,9 +143,11 @@ function makeSimWorld(settings) {
         var i, j, pt, pa, pb, ra, rb, spr;
         var pointIntegrator = this.integrator;
         
+        
+        var bondSolver = this.springsHooke ? penaltyForceSolver : positionConstraintSolver;
         for (i=0; i<this.springs.length; i++) {
             spr = this.springs[i];
-            computeSpringForces(spr);
+            bondSolver(spr, this);
         }
         
         if (this.collisions) {
