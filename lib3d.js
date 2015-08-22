@@ -349,6 +349,11 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         this.updateTransform();
     };
     
+    camera.getRayFromScreen = function(screenX, screenY, res) {
+        res = res || makeVec3(0,0,0);
+        
+    };
+    
     camera.updateTransform(alpha, beta, screenW, screenH, scale);
     
     return camera;
@@ -363,7 +368,7 @@ function applyCameraTransform(camera, vec, res) {
 }
 
 function make3dIndex(cellSide, xsize, ysize) {
-    var index = {};
+    var index = this;
     
     index.side = cellSide;
     index.xsize = xsize;
@@ -373,78 +378,77 @@ function make3dIndex(cellSide, xsize, ysize) {
     index.k = 1/index.side;
     index.cells = {};
     index.neighborhood = [
-        [0,0,0],
-        [0,0,1],
-        [1,0,1],
-        [-1,0,1],
-        [0,1,1],
-        [0,-1,1],
-        [1,1,1],
-        [1,-1,1],
-        [-1,1,1],
-        [-1,-1,1],
-        [1,0,0],
-        [-1,0,0],
-        [0,1,0],
-        [0,-1,0],
-        [1,1,0],
-        [1,-1,0],
-        [-1,1,0],
-        [-1,-1,0],
-        [0,0,-1],
-        [1,0,-1],
-        [-1,0,-1],
-        [0,1,-1],
-        [0,-1,-1],
-        [1,1,-1],
-        [1,-1,-1],
-        [-1,1,-1],
-        [-1,-1,-1]
+        0,0,0,
+        0,0,1,
+        1,0,1,
+        -1,0,1,
+        0,1,1,
+        0,-1,1,
+        1,1,1,
+        1,-1,1,
+        -1,1,1,
+        -1,-1,1,
+        1,0,0,
+        -1,0,0,
+        0,1,0,
+        0,-1,0,
+        1,1,0,
+        1,-1,0,
+        -1,1,0,
+        -1,-1,0,
+        0,0,-1,
+        1,0,-1,
+        -1,0,-1,
+        0,1,-1,
+        0,-1,-1,
+        1,1,-1,
+        1,-1,-1,
+        -1,1,-1,
+        -1,-1,-1
     ];
-        
-    index.addObject = function(pos, obj) {
-        var x = pos[0];
-        var y = pos[1];
-        var z = pos[2];
-        var cx = Math.floor(x * this.k)+this.xsize;
-        var cy = Math.floor(y * this.k)+this.ysize;
-        var cz = Math.floor(z * this.k);
-        var i = cx+cy*this.ycoeff+cz*this.zcoeff;
-        if (!this.cells[i]) this.cells[i] = [obj];
-        else this.cells[i].push(obj);
-    };
-    
-    index.mapObjectsInRadius = function (x, y, z, fn) {
-        var cx = Math.floor(x * this.k)+this.xsize;
-        var cy = Math.floor(y * this.k)+this.ysize;
-        var cz = Math.floor(z * this.k);
-        var result = [];
-        var i, k, index, objects, dx, dy, dz;
-        var near = this.neighborhood;
-        
-        for (i=0; i<near.length; i++) {
-            dx = near[i][0];
-            dy = near[i][1];
-            dz = near[i][2];
-            index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
-            objects = this.cells[index];
-            if (objects) {
-                for (k=0; k<objects.length; k++) {
-                    fn(objects[k]);
-                }
-            }
-        }
-    };
-    
-    index.getStats = function() {
-        
-    };
     
     return index;
 }
 
+make3dIndex.prototype.addObject = function(pos, obj) {
+    var x = pos[0];
+    var y = pos[1];
+    var z = pos[2];
+    var cx = Math.floor(x * this.k)+this.xsize;
+    var cy = Math.floor(y * this.k)+this.ysize;
+    var cz = Math.floor(z * this.k);
+    var i = cx+cy*this.ycoeff+cz*this.zcoeff;
+    if (!this.cells[i]) this.cells[i] = [obj];
+    else this.cells[i].push(obj);
+};
+    
+make3dIndex.prototype.mapObjectsInRadius = function (x, y, z, fn) {
+    var cx = Math.floor(x * this.k)+this.xsize;
+    var cy = Math.floor(y * this.k)+this.ysize;
+    var cz = Math.floor(z * this.k);
+    var i, k, index, objects, dx, dy, dz;
+    var near = this.neighborhood;
+    
+    for (i=0; i<near.length; i+=3) {
+        dx = near[i];
+        dy = near[i+1];
+        dz = near[i+2];
+        index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
+        objects = this.cells[index];
+        if (objects) {
+            for (k=0; k<objects.length; k++) {
+                fn(objects[k]);
+            }
+        }
+    }
+};
+    
+make3dIndex.prototype.getStats = function() {
+    //TODO
+};
+
 function test3dIndex() {
-    var N = 1000000;
+    var N = 10000000;
     var L = 1.0;
     var w = 100;
     var h = 100;
@@ -454,7 +458,7 @@ function test3dIndex() {
     var i,j;
     var random = Math.random;
     
-    var index = make3dIndex(side, w+2, h+2);
+    var index = new make3dIndex(side, w+2, h+2);
     
     for (i=0; i<N; i++) {
         var ball = {pos: [random()*w, random()*h, random()*d]}

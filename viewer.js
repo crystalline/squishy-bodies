@@ -180,9 +180,11 @@ function runSimulationInViewer(simConfig) {
     };
     
     gui.add(config, "pauseRender");
+    gui.add(world, "drawAtoms");
+    gui.add(world, "drawBonds");
     gui.add(config, "pauseSim");
     gui.add(simConfig, "simDt");
-    gui.add(config, "controller");
+    if (simConfig.controller) gui.add(config, "controller");
     gui.add(cam, "alpha", -180, 180).onChange(camUpdate);
     gui.add(cam, "beta", -180, 180).onChange(camUpdate);
     gui.add(cam, "scale").onChange(camUpdate);

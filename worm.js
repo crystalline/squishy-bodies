@@ -1,4 +1,4 @@
-2//C-elegans-like worm model constructor
+//C-elegans-like worm model constructor
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 //L is the number of rings, N is a number of sections per ring R is radius of ring, dist is distance between rings	   
@@ -18,8 +18,6 @@ function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
         points = points.concat(ring.points);
         springs = springs.concat(ring.springs);
         rings.push(translatePoints(makeVec3(i*dist, 0, 0), rotatePoints(makeVec3(0,1,0), Math.PI/2, ring)));
-        //rings.push(translatePoints(makeVec3(i*dist, 0, 0), ring));
-        //console.log(rings[rings.length-1]);
     }
     
     for (i=0; i<L-1; i++) {
@@ -33,9 +31,7 @@ function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
     }
     
     springs = springs.concat(axialSprings);
-    
-    //var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1], lines[2]], rightLines: [lines[5], lines[6]]};
-    
+
     var body = {points: points, springs: springs, rings: rings, lines: lines, leftLines: [lines[1]], rightLines: [lines[4]]};
     
     translatePoints(makeVec3(-L*dist/2,0,2), body);
@@ -155,7 +151,6 @@ function runWormDemo() {
         gui.add(window, "wormStiffness").onFinishChange(function(val) {
             simConfig.worm.springs.forEach(function(spr) { spr.l = wormStiffness });
         });
-        gui.add(world, "sortPointsByZ");
     };
     
     runSimulationInViewer(simulation);

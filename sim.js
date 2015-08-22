@@ -22,9 +22,6 @@ function makeSoftBody(points, springs) {
     return {points: points, springs: springs};
 }
 
-window.springsForce = false;
-window.collisionForce = false;
-
 function penaltyForceSolver(spring) {
     var pa = spring.pa;
     var pb = spring.pb;
@@ -106,6 +103,43 @@ function integratePointVerlet(point, dt) {
    zeroVec3(point.force);
 }
 
+function computeCollision(pa, pb) {
+    if (pa != pb && pa.radius && pb.radius) {
+        var ra = pa.radius;
+        var rb = pb.radius;
+        var diff = subVecs(pb.pos, pa.pos);
+        var length = l2norm(diff);
+        var critlen = ra+rb;
+        var penetration = length-critlen;
+        
+        if (penetration<0) {
+            
+            var normal = scalXvec(1/length, diff);
+            
+            if (window.collisionForce) {                                
+                var force = scalXvec(collK*penetration, normal);
+                addVecs(pa.force, force, pa.force);
+                var force = scalXvec(-1, force, force);
+                addVecs(pb.force, force, pb.force);
+            } else {
+                if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal), pb.pos);
+                if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal), pa.pos);                    
+            }
+            
+            /*
+            var ma = pa.mass;
+            var mb = pb.mass;
+            var J = -(1+0.3)*dotVecs(subVecs(pa.v, pb.v), normal)/((1/ma+1/mb));
+            addVecs(pa.v, scalXvec(J/ma, normal), pa.v);
+            addVecs(pb.v, scalXvec(J/mb, normal), pb.v);
+            */
+        }
+    }
+}
+
+prng = new util.prng(12317);
+pseudoRandom = function() { return prng.next() };
+
 function makeSimWorld(settings) {
     
     //Default settings
@@ -123,10 +157,12 @@ function makeSimWorld(settings) {
         surfaceDragNorm: 0.01,
         integrator: integratePointVerlet,
         //Graphics parameters
-        sortPointsByZ: true,
+        sortPointsByZ: false,
         pointWidth: 5,
         lineWidth: 2,
-        gridWidth: 1
+        gridWidth: 1,
+        drawBonds: true,
+        drawAtoms: true,
     };
     
     util.simpleExtend(world, settings);
@@ -143,59 +179,24 @@ function makeSimWorld(settings) {
         var i, j, pt, pa, pb, ra, rb, spr;
         var pointIntegrator = this.integrator;
         
-        
         var bondSolver = this.springsHooke ? penaltyForceSolver : positionConstraintSolver;
+        util.arrayShuffle(this.springs);
         for (i=0; i<this.springs.length; i++) {
             spr = this.springs[i];
             bondSolver(spr, this);
         }
         
         if (this.collisions) {
-            
-            var index3d;
-            if (this.collisionIndex) {
-                index3d = make3dIndex(1.1,100,100,100);
-                for (i=0; i<this.points.length; i++) {
-                    var p = this.points[i];
-                    index3d.addObject(p.pos, p);
-                }
-            }
-            
             util.arrayShuffle(this.points);
             var collStartT = Date.now();
             var collK = world.collisionK;
+            var index3d;
             
-            function computeCollision(pa, pb) {
-                if (pa != pb && pa.radius && pb.radius) {
-                    var ra = pa.radius;
-                    var rb = pb.radius;
-                    var diff = subVecs(pb.pos, pa.pos);
-                    var length = l2norm(diff);
-                    var critlen = ra+rb;
-                    var penetration = length-critlen;
-                    
-                    if (penetration<0) {
-                        
-                        var normal = scalXvec(1/length, diff);
-                        
-                        if (window.collisionForce) {                                
-                            var force = scalXvec(collK*penetration, normal);
-                            addVecs(pa.force, force, pa.force);
-                            var force = scalXvec(-1, force, force);
-                            addVecs(pb.force, force, pb.force);
-                        } else {
-                            if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal), pb.pos);
-                            if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal), pa.pos);                    
-                        }
-                        
-                        /*
-                        var ma = pa.mass;
-                        var mb = pb.mass;
-                        var J = -(1+0.3)*dotVecs(subVecs(pa.v, pb.v), normal)/((1/ma+1/mb));
-                        addVecs(pa.v, scalXvec(J/ma, normal), pa.v);
-                        addVecs(pb.v, scalXvec(J/mb, normal), pb.v);
-                        */
-                    }
+            if (this.collisionIndex) {
+                index3d = new make3dIndex(1.05,100,100,100);
+                for (i=0; i<this.points.length; i++) {
+                    var p = this.points[i];
+                    index3d.addObject(p.pos, p);
                 }
             }
             
@@ -295,22 +296,25 @@ function makeSimWorld(settings) {
             applyCameraTransform(camera, pt.pos, pt.scrPos);
         }
         
-        if (this.sortPointsByZ) { this.points.sort(comparePoints); }
-        
-        for (i=0; i<this.points.length; i++) {
-            pt = this.points[i];
-            width = ptW;
-            if (pt.radius) width = camera.screenScaling*pt.radius;
-            screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, 1, pt.color);
+        if (this.drawAtoms) {            
+            if (this.sortPointsByZ) { this.points.sort(comparePoints); }
+            for (i=0; i<this.points.length; i++) {
+                pt = this.points[i];
+                width = ptW;
+                if (pt.radius) width = camera.screenScaling*pt.radius;
+                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, 1, pt.color);
+            }
         }
         
-        for (i=0; i<this.springs.length; i++) {
-            spr = this.springs[i];
-            ptA = spr.pa;
-            ptB = spr.pb;
-            screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW, spr.color);
+        if (this.drawBonds) {
+            for (i=0; i<this.springs.length; i++) {
+                spr = this.springs[i];
+                ptA = spr.pa;
+                ptB = spr.pb;
+                screen.drawLine(ptA.scrPos[0], ptA.scrPos[1], ptB.scrPos[0], ptB.scrPos[1], lineW, spr.color);
+            }
         }
-                   
+        
         drawGrid(camera, screen, 10, 10, gridW);
     };
     

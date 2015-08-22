@@ -97,26 +97,22 @@ function fade(index) {
 function makeFallingStrutsWorld() {
     var world = makeSimWorld(worldSettings);
     
-    var leg1 = makeLeg({origin: [-1,0,6],
-                        dir: [0,0,1],
-                        nsegments: 16,
-                        seglen: 1.1,
-                        nlines: 6,
-                        stiffness: 30,
-                        pmass: 1,
-                        pradius: 0.5,
-                        shape: 1.3});
-    
-    var leg2 = makeLeg({origin: [-1,-6,6],
-                        dir: [0,0.2,1],
-                        nsegments: 16,
-                        seglen: 1.1,
-                        nlines: 6,
-                        stiffness: 30,
-                        pmass: 1,
-                        pradius: 0.5,
-                        shape: 1.3});
-          
+    var i,j,N=5;
+    for (i=0; i<N; i++) {
+         for (j=0; j<N; j++) {
+            var leg = makeLeg({origin: [4*(j-N/2),4*(i-N/2),6],
+                                dir: [0,1,1],
+                                nsegments: 16,
+                                seglen: 1.1,
+                                nlines: 6,
+                                stiffness: 30,
+                                pmass: 1,
+                                pradius: 0.5,
+                                shape: 1.3});
+            world.addSoftBody(makeSoftBody(leg.points, leg.springs));
+        }
+    }
+             
     var leg3 = makeLeg({origin: [0,-8,1.5],
                         dir: [0,1,0],
                         nsegments: 16,
@@ -127,9 +123,8 @@ function makeFallingStrutsWorld() {
                         pradius: 0.5,
                         shape: 1.3});
     
-    world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
-    world.addSoftBody(makeSoftBody(leg2.points, leg2.springs));
     world.addSoftBody(makeSoftBody(leg3.points, leg3.springs));
+    
     return world;
 }
 
@@ -199,7 +194,7 @@ function runQuadDemo() {
     
     simulation.simDt = 0.03;
     simulation.setup = function(world, camera, gui, simConfig) {
-        gui.add(world, "sortPointsByZ");
+        
     };
     
     runSimulationInViewer(simulation);

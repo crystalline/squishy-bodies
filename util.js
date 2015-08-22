@@ -21,9 +21,10 @@ util = {
         }
         return dst;
     },
-    arrayShuffle: function (array) {
+    arrayShuffle: function (array, random) {
+        random = random || Math.random;
         for (var i = array.length - 1; i > 0; i--) {
-            var j = Math.floor(Math.random() * (i + 1));
+            var j = Math.floor(random() * (i + 1));
             var temp = array[i];
             array[i] = array[j];
             array[j] = temp;
@@ -38,5 +39,32 @@ util = {
             }
         }
         return arguments[0];
+    },
+    //Very simple pseudorandom number generator
+    prng: function(seed) {
+        this.seed = seed % 2147483647;
+        if (this.seed <= 0) this.seed += 2147483646;
+        this.state = this.seed;
     }
+};
+
+util.prng.prototype.nextInt = function () {
+    return this.state = this.state * 16807 % 2147483647;
+};
+
+util.prng.prototype.next = function () {
+    // We know that result of next() will be 1 to 2147483646 (inclusive).
+    return (this.nextInt() - 1) / 2147483646;
+};
+
+util.prng.prototype.reset = function() { this.state = this.seed };
+
+util.prng.prototype.test = function() {
+    var s = 0;
+    for (var i = 0; i<1000; i++) {
+        s += this.next();
+    }
+    console.log('Testing prng, seed= '+this.seed);
+    console.log('Expected value: '+s/1000);
+    this.reset();
 };
