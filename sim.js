@@ -103,30 +103,35 @@ function integratePointVerlet(point, dt) {
    zeroVec3(point.force);
 }
 
+var temp = makeVec3(0,0,0);
+var temp1 = makeVec3(0,0,0);
+var temp2 = makeVec3(0,0,0);
+
 function computeCollision(pa, pb) {
-    if (pa != pb && pa.radius && pb.radius) {
+    if (pa != pb) {
         var ra = pa.radius;
         var rb = pb.radius;
-        var diff = subVecs(pb.pos, pa.pos);
+        var diff = subVecs(pb.pos, pa.pos, temp);
         var length = l2norm(diff);
         var critlen = ra+rb;
         var penetration = length-critlen;
         
         if (penetration<0) {
+            window.s.world.cc++;
+            var normal = scalXvec(1/length, diff, temp1);
             
-            var normal = scalXvec(1/length, diff);
+            if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal, temp2), pb.pos);
+            if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal, temp2), pa.pos);
             
+            /*
             if (window.collisionForce) {                                
                 var force = scalXvec(collK*penetration, normal);
                 addVecs(pa.force, force, pa.force);
                 var force = scalXvec(-1, force, force);
                 addVecs(pb.force, force, pb.force);
             } else {
-                if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal), pb.pos);
-                if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal), pa.pos);                    
             }
             
-            /*
             var ma = pa.mass;
             var mb = pb.mass;
             var J = -(1+0.3)*dotVecs(subVecs(pa.v, pb.v), normal)/((1/ma+1/mb));
@@ -169,55 +174,103 @@ function makeSimWorld(settings) {
     
     world.points = [];
     world.springs = [];
-    
+    world.pIdCounter = 0;
+    world.connIndex = {};
+    if (indexCellSpreading) world.index3d = new make3dIndex(1.05,100,100,100);
+                
     world.addSoftBody = function(body) {
+        var i;
+        for (i=0; i<body.points.length; i++) {
+            var point = body.points[i];
+            point.id = this.pIdCounter++;
+        }
+        for (i=0; i<body.springs.length; i++) {
+            var spring = body.springs[i];
+            if (!this.connIndex[spring.pa.id]) {
+                this.connIndex[spring.pa.id] = {};
+            }
+            this.connIndex[spring.pa.id][spring.pb.id] = true;
+            if (!this.connIndex[spring.pb.id]) {
+                this.connIndex[spring.pb.id] = {};
+            }
+            this.connIndex[spring.pb.id][spring.pa.id] = true;
+        }
+        if (indexCellSpreading)
+            for (i=0; i<body.points.length; i++) {
+                var point = body.points[i];
+                this.index3d.addObject(point.pos, point, this.connIndex);
+            }
         util.pushBack(this.points, body.points);
         util.pushBack(this.springs, body.springs);
     };
     
+    world.checkBond = function(pa, pb) {
+        return this.connIndex[pa.id] && this.connIndex[pa.id][pb.id];
+    };
+    
     world.step = function(dt) {
+        var stepStartT = Date.now();
         var i, j, pt, pa, pb, ra, rb, spr;
         var pointIntegrator = this.integrator;
-        
-        var bondSolver = this.springsHooke ? penaltyForceSolver : positionConstraintSolver;
-        util.arrayShuffle(this.springs);
-        for (i=0; i<this.springs.length; i++) {
-            spr = this.springs[i];
-            bondSolver(spr, this);
-        }
+        var that = this;
         
         if (this.collisions) {
-            util.arrayShuffle(this.points);
-            var collStartT = Date.now();
+            util.arrayShuffle(this.points, pseudoRandom);
+            var collStartIndexT = Date.now();
             var collK = world.collisionK;
-            var index3d;
-            
+                        
             if (this.collisionIndex) {
-                index3d = new make3dIndex(1.05,100,100,100);
-                for (i=0; i<this.points.length; i++) {
-                    var p = this.points[i];
-                    index3d.addObject(p.pos, p);
+                
+                if (indexCellSpreading) {
+                    this.index3d.updateIndex(this.connIndex);
+                } else {
+                    this.index3d = new make3dIndex(1.1,100,100,100);
+                    for (i=0; i<this.points.length; i++) {
+                        var p = this.points[i];
+                        this.index3d.addObject(p.pos, p, this.connIndex);
+                    }
                 }
+                
             }
+            
+            var collStartT = Date.now();
             
             if (this.collisionIndex) {
                 for (i=0; i<this.points.length; i++) {
                     pa = this.points[i];
-                    index3d.mapObjectsInRadius(pa.pos[0], pa.pos[1], pa.pos[2], function(pb) {
-                        computeCollision(pa, pb);
-                    });
+                    
+                    if (indexCellSpreading) {
+                        this.index3d.mapObjectsInRadiusAroundObject(pa, function(pb) {
+                            { computeCollision(pa, pb); }
+                        }, this.connIndex);
+                    } else {
+                        this.index3d.mapObjectsInRadius(pa.pos[0], pa.pos[1], pa.pos[2], function(pb) {
+                            //if (!that.checkBond(pa,pb)) { computeCollision(pa, pb); }
+                            computeCollision(pa, pb);
+                        });
+                    }
+                                 
                 }
             } else {
                 for (i=0; i<this.points.length; i++) {
                     pa = this.points[i];
                     for (j=0; j<this.points.length; j++) {
                         pb = this.points[j];
-                        computeCollision(pa, pb);
+                        if (!this.checkBond(pa,pb)) computeCollision(pa, pb);
                     }
                 }
             }            
             
             this.collTime = Date.now() - collStartT;
+            this.collIndexTime = collStartT - collStartIndexT;
+            
+        }
+        
+        var bondSolver = this.springsHooke ? penaltyForceSolver : positionConstraintSolver;
+        util.arrayShuffle(this.springs, pseudoRandom);
+        for (i=0; i<this.springs.length; i++) {
+            spr = this.springs[i];
+            bondSolver(spr, this);
         }
         
         for (i=0; i<this.points.length; i++) {
@@ -229,6 +282,7 @@ function makeSimWorld(settings) {
         }
         
         this.timestep++;
+        this.prevStepTime = Date.now() - stepStartT;
     };
     
     world.measureEnergy = function() {

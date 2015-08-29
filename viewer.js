@@ -84,7 +84,7 @@ function makeGraphics() {
         var ctx = this.ctx;
         if (ctx.stroke) ctx.lineWidth = stroke;
         ctx.beginPath();
-        ctx.arc(x, y, r, 0, 2 * Math.PI, false);
+        ctx.arc(Math.round(x), Math.round(y), Math.round(r), 0, 2 * Math.PI, false);
         if (!stroke) ctx.fill();
         else ctx.stroke();
         if (oldCol) { this.ctx.fillStyle = oldCol; }
@@ -104,8 +104,8 @@ function makeGraphics() {
         if (col) { oldCol = this.ctx.strokeStyle; this.ctx.strokeStyle = col; }
         ctx.beginPath();
         ctx.lineWidth = width || 1/this.size;
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
+        ctx.moveTo(Math.round(x1), Math.round(y1));
+        ctx.lineTo(Math.round(x2), Math.round(y2));
         ctx.stroke();
         if (oldCol) { this.ctx.strokeStyle = oldCol; }
     };  
@@ -120,6 +120,7 @@ function makeGraphics() {
     
     graphics.drawText = function(text,x,y) {
         this.ctx.save();
+        this.ctx.fillStyle = "#00AA00";
         this.ctx.setTransform(2, 0, 0, 2, 0, 0);
         if (typeof text == "string") {
             this.ctx.fillText(text, x, y);
@@ -291,17 +292,16 @@ function runSimulationInViewer(simConfig) {
         }
         if (!config.pauseSim) {
             var simDt = simConfig.simDt;
-            var totalStep = simDt;
             if (simConfig.preTimestep) {
-                simConfig.preTimestep(world, totalStep, timestep*(totalStep/simDt), simConfig);
+                simConfig.preTimestep(world, simDt, timestep, simConfig);
             }
             world.step(simDt);        
             ac.step(simDt);
             if (simConfig.postTimestep) {
-                simConfig.postTimestep(world, totalStep, timestep*(totalStep/simDt), simConfig);
+                simConfig.postTimestep(world, simDt, timestep, simConfig);
             }
             if (simConfig.controller && config.controller) {
-                simConfig.controller(world, totalStep, timestep*(totalStep/simDt), simConfig);
+                simConfig.controller(world, simDt, timestep, simConfig);
             }
         }
         if (!config.pauseRender) { 
@@ -312,7 +312,12 @@ function runSimulationInViewer(simConfig) {
         var frameT = time - prevFrameT;
         var stats = [Math.round(1000/(frameT))+' fps',
                      (Math.round(world.measureEnergy()*10)/10)+ ' energy'];
-        if (util.isNumeric(world.collTime)) stats.push( 'collision '+(world.collTime)+' ms' );
+        if (util.isNumeric(world.collIndexTime))
+            stats.push( 'collision indexing '+(world.collIndexTime)+' ms' );
+        if (util.isNumeric(world.collTime))
+            stats.push( 'collision '+(world.collTime)+' ms' );
+        if (util.isNumeric(world.prevStepTime))
+            stats.push( 'cpu time per step '+(world.prevStepTime)+' ms' );
         stats.push(world.points.length+' atoms '+world.springs.length+' bonds');
         graphics.drawText(stats, 10, 10);
         prevFrameT = time;

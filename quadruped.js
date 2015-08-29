@@ -97,7 +97,7 @@ function fade(index) {
 function makeFallingStrutsWorld() {
     var world = makeSimWorld(worldSettings);
     
-    var i,j,N=5;
+    var i,j,N=8;
     for (i=0; i<N; i++) {
          for (j=0; j<N; j++) {
             var leg = makeLeg({origin: [4*(j-N/2),4*(i-N/2),6],
@@ -174,6 +174,7 @@ function makeRigidityTestWorld() {
 
 var worldSettings = {
     collisions: true,
+    collisionIndex: true,
     collisionK: 20.0,
     surfaceK: 5.0,
     surfaceDrag: 0.28,
@@ -191,11 +192,28 @@ function runQuadDemo() {
     window.s = simulation;
     
     simulation.world = makeFallingStrutsWorld();
+    simulation.world.cc = 0;
     
     simulation.simDt = 0.03;
     simulation.setup = function(world, camera, gui, simConfig) {
         
     };
+    
+    function hashSim(world, step) {
+        console.log("Sim timestep="+step+" hash="+util.stringHash(JSON.stringify(world.points.map(function(p) { return p.pos })))+" cc="+world.cc);
+    }
+    
+    simulation.postTimestep = function (world, dt, n) {
+        if (n == 20) {
+            hashSim(world, n)
+        }
+        if (n == 250) {
+            hashSim(world, n)
+        }
+    }
+    
+    console.log("collisionIndex="+simulation.world.collisionIndex);
+    console.log("indexCellSpreading="+indexCellSpreading);
     
     runSimulationInViewer(simulation);
 }

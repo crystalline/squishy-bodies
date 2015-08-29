@@ -132,3 +132,14 @@ function makeCube(center, side, mass, stiffness) {
     return {points: points, springs: springs};
 }
 
+function makeVoxelBox(l,w,h) {
+    
+}
+
+function makeFromVoxelArray( ) {
+
+}
+
+
+
+
