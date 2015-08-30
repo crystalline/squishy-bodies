@@ -187,8 +187,9 @@ function makeSimWorld(settings) {
     world.points = [];
     world.springs = [];
     world.pIdCounter = 0;
-    world.connIndex = {};
-    if (indexCellSpreading) world.index3d = new make3dIndex(1.05,100,100,100);
+    world.connIndex = [];
+    //if (indexCellSpreading) world.index3d = new make3dIndex(1.05,100,100,100);
+    world.index3d = new make3dIndex(1.05,100,100,100);
                 
     world.addSoftBody = function(body) {
         var i;
@@ -207,7 +208,7 @@ function makeSimWorld(settings) {
             }
             this.connIndex[spring.pb.id][spring.pa.id] = true;
         }
-        if (indexCellSpreading)
+        //if (indexCellSpreading)
             for (i=0; i<body.points.length; i++) {
                 var point = body.points[i];
                 this.index3d.addObject(point.pos, point, this.connIndex);
@@ -233,8 +234,10 @@ function makeSimWorld(settings) {
                         
             if (this.collisionIndex) {
                 
-                if (indexCellSpreading) {
-                    this.index3d.updateIndex(this.connIndex);
+                //if (indexCellSpreading) {
+                this.index3d.updateIndex(this.connIndex);
+                
+                /*
                 } else {
                     this.index3d = new make3dIndex(1.1,100,100,100);
                     for (i=0; i<this.points.length; i++) {
@@ -242,6 +245,7 @@ function makeSimWorld(settings) {
                         this.index3d.addObject(p.pos, p, this.connIndex);
                     }
                 }
+                */
                 
             }
             
@@ -252,16 +256,16 @@ function makeSimWorld(settings) {
                     pa = this.points[i];
                     
                     if (indexCellSpreading) {
-                        this.index3d.mapObjectsInRadiusAroundObject(pa, function(pb) {
-                            { computeCollision(pa, pb); }
-                        }, this.connIndex);
+                        this.index3d.mapObjectsInRadiusAroundObject(pa,
+                            function(pb) {
+                                computeCollision(pa, pb);
+                            }, this.connIndex);
                     } else {
-                        this.index3d.mapObjectsInRadius(pa.pos[0], pa.pos[1], pa.pos[2], function(pb) {
-                            //if (!that.checkBond(pa,pb)) { computeCollision(pa, pb); }
-                            computeCollision(pa, pb);
-                        });
+                        this.index3d.mapObjectsInRadiusAroundObject(pa, 
+                            function(pb) {
+                                computeCollision(pa, pb);
+                            }, this.connIndex);
                     }
-                                 
                 }
             } else {
                 for (i=0; i<this.points.length; i++) {
