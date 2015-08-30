@@ -34,6 +34,12 @@ function compareVec3(va, vb) {
     return va[0] == vb[0] && va[1] == vb[1] && va[2] == vb[2];
 }
 
+function copyVec3(src, dst) {
+    dst[0] = src[0];
+    dst[1] = src[1];
+    dst[2] = src[2];
+    return dst;
+}
 
 function makeQuat(w,x,y,z) {
     return [w,x,y,z];

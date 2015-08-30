@@ -55,7 +55,21 @@ util = {
         this.seed = seed % 2147483647;
         if (this.seed <= 0) this.seed += 2147483646;
         this.state = this.seed;
+    },
+    //Simple tracker of an average value
+    avgTracker: function() {
+        this.x = 0;
+        this.N = 0;
     }
+};
+
+util.avgTracker.prototype.update = function(next) {
+    this.x += (1/(this.N+1))*(next-this.x);
+    this.N++;
+};
+
+util.avgTracker.prototype.getRounded = function(N) {
+    return Math.round(this.x*N)/N;
 };
 
 util.prng.prototype.nextInt = function () {

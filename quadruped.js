@@ -97,7 +97,7 @@ function fade(index) {
 function makeFallingStrutsWorld() {
     var world = makeSimWorld(worldSettings);
     
-    var i,j,N=8;
+    var i,j,N=9;
     for (i=0; i<N; i++) {
          for (j=0; j<N; j++) {
             var leg = makeLeg({origin: [4*(j-N/2),4*(i-N/2),6],

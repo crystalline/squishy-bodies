@@ -284,6 +284,8 @@ function runSimulationInViewer(simConfig) {
     var timestep = 0;
     var frameCount = 0;
     
+    var avgStep = new util.avgTracker();
+    
     function draw() {
         requestAnimationFrame(draw);
         if (camera.needUpdate) { 
@@ -303,13 +305,17 @@ function runSimulationInViewer(simConfig) {
             if (simConfig.controller && config.controller) {
                 simConfig.controller(world, simDt, timestep, simConfig);
             }
+            
+            avgStep.update(world.prevStepTime);
         }
         if (!config.pauseRender) { 
             graphics.clear();
             world.draw(camera, graphics);
         }
+        
         var time = Date.now();
         var frameT = time - prevFrameT;
+        
         var stats = [Math.round(1000/(frameT))+' fps',
                      (Math.round(world.measureEnergy()*10)/10)+ ' energy'];
         if (util.isNumeric(world.collIndexTime))
@@ -317,9 +323,10 @@ function runSimulationInViewer(simConfig) {
         if (util.isNumeric(world.collTime))
             stats.push( 'collision '+(world.collTime)+' ms' );
         if (util.isNumeric(world.prevStepTime))
-            stats.push( 'cpu time per step '+(world.prevStepTime)+' ms' );
+            stats.push( 'cpu time per step '+(world.prevStepTime)+' ms'+', avg '+avgStep.getRounded(1)+' ms');
         stats.push(world.points.length+' atoms '+world.springs.length+' bonds');
         graphics.drawText(stats, 10, 10);
+        
         prevFrameT = time;
         timestep++;
         frameCount++;

@@ -22,6 +22,12 @@ function makeSoftBody(points, springs) {
     return {points: points, springs: springs};
 }
 
+var temp = makeVec3(0,0,0);
+var temp1 = makeVec3(0,0,0);
+var temp2 = makeVec3(0,0,0);
+var temp3 = makeVec3(0,0,0);
+var temp4 = makeVec3(0,0,0);
+
 function penaltyForceSolver(spring) {
     var pa = spring.pa;
     var pb = spring.pb;
@@ -38,16 +44,16 @@ function penaltyForceSolver(spring) {
 function positionConstraintSolver(spring) {
     var pa = spring.pa;
     var pb = spring.pb;
-    var diff = subVecs(pb.pos, pa.pos);
+    var diff = subVecs(pb.pos, pa.pos, temp);
     var length = l2norm(diff);
-    var normal = scalXvec(1/length, diff);
+    var normal = scalXvec(1/length, diff, temp2);
     
-    if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*(length-spring.l), normal), pb.pos);
-    if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*(length-spring.l), normal), pa.pos);
+    if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*(length-spring.l), normal, temp1), pb.pos);
+    if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*(length-spring.l), normal, temp1), pa.pos);
 }
 
 function computeSimpleFriction(point, world) {
-    addVecs(point.force, scalXvec(-world.surfaceDrag, point.v), point.force);
+    addVecs(point.force, scalXvec(-world.surfaceDrag, point.v, temp), point.force);
 }
 
 function computeAnisoFriction(point, world) {
@@ -82,7 +88,7 @@ function computePointForces(point, world) {
     } else {
         point.ground = false;
         //Add air drag force
-        addVecs(point.force, scalXvec(-world.airDrag, point.v), point.force);
+        addVecs(point.force, scalXvec(-world.airDrag, point.v, temp), point.force);
     }
     
     point.force[2] -= world.g * point.mass;
@@ -95,17 +101,23 @@ function integratePointEuler(point, dt) {
 }
 
 function integratePointVerlet(point, dt) {
-   var next = addVecs(subVecs(scalXvec(2, point.pos), point.ppos),
-                      scalXvec(dt*dt/point.mass, point.force));
+   var next = temp;
+   
+   addVecs(subVecs(scalXvec(2, point.pos, temp1), point.ppos, temp2),
+                   scalXvec(dt*dt/point.mass, point.force, temp3), next);
+   
+   scalXvec(1/dt, subVecs(next, point.pos), point.v);
+   
+   var prev = point.ppos;
    point.ppos = point.pos;
-   point.v = scalXvec(1/dt, subVecs(next, point.pos));
-   point.pos = next;
+   point.pos = prev;
+   
+   point.pos[0] = next[0];
+   point.pos[1] = next[1];
+   point.pos[2] = next[2];
+   
    zeroVec3(point.force);
 }
-
-var temp = makeVec3(0,0,0);
-var temp1 = makeVec3(0,0,0);
-var temp2 = makeVec3(0,0,0);
 
 function computeCollision(pa, pb) {
     if (pa != pb) {
