@@ -183,6 +183,7 @@ var worldSettings = {
     surfaceDragNorm: 0.01,
     airDrag: 0.2,
     g: 1.0,
+    drawBonds: false,
     sortPointsByZ: 0
 }
 

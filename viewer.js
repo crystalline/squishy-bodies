@@ -275,6 +275,7 @@ function runSimulationInViewer(simConfig) {
     window.addEventListener("mousewheel", function(event) {
         var rotation = -event.deltaY/window.innerHeight;
         cam.scale *= (1+rotation);
+        if (cam.scale < 0.001) cam.scale = 0.001;
         gui.updateManually();
         camUpdate();
     });

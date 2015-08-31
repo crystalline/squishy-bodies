@@ -388,7 +388,8 @@ function make3dIndex(cellSide, xsize, ysize) {
     index.cells = {};
     index.objectCache = {};
     index.indexCache = {};
-    index.neighborhood = new Int32Array([
+    index.neighbourCache = {};
+    index.neighbourhood = new Int32Array([
         0,0,0,
         0,0,1,
         1,0,1,
@@ -424,65 +425,45 @@ function make3dIndex(cellSide, xsize, ysize) {
 make3dIndex.prototype.getStats = function() {
     var i;
     var nOccCells = 0;
-    var nBalls = 0;
+    var nBalls = new util.avgTracker();
+    var collListLen = new util.avgTracker();
     for (var i in this.cells) {
         nOccCells++;
-        nBalls += this.cells[i].length;
+        nBalls.update(this.cells[i].length);
     }
-    return {avgObjsPerCell: nBalls/nOccCells};
+    
+    var emptyCollLists = 0;
+    for (var id in this.objectCache) {
+        if (this.neighbourCache[id])
+            collListLen.update(this.neighbourCache[id].length);
+        else
+            emptyCollLists++;
+    }
+    return {avgObjsPerCell: nBalls.x, occupiedCells: nOccCells, avgCollListLen: collListLen.x, emptyCollLists: emptyCollLists};
 };
 
-if (!indexCellSpreading) {
-
-make3dIndex.prototype.addObject = function(pos, obj) {
+make3dIndex.prototype.addObject = function(pos, obj, collisionMask) {
     var x = pos[0];
     var y = pos[1];
     var z = pos[2];
     var cx = Math.floor(x * this.k)+this.xsize;
     var cy = Math.floor(y * this.k)+this.ysize;
     var cz = Math.floor(z * this.k);
-    var i = cx+cy*this.ycoeff+cz*this.zcoeff;
+    var i, k, index, objects, dx, dy, dz;
+
+    index = cx+cy*this.ycoeff+cz*this.zcoeff;
     
-    if (!this.cells[i]) this.cells[i] = [obj];
-    else this.cells[i].push(obj);
+    if (!this.cells[index]) this.cells[index] = [obj];
+    else this.cells[index].push(obj);
     
     this.objectCache[obj.id] = obj;
-    this.indexCache[obj.id] = i;
-};
+    this.indexCache[obj.id] = index;
+    this.neighbourCache[obj.id] = false;
 
-make3dIndex.prototype.mapObjectsInRadius = function (x, y, z, fn, collisionMask) {
-    var cx = Math.floor(x * this.k)+this.xsize;
-    var cy = Math.floor(y * this.k)+this.ysize;
-    var cz = Math.floor(z * this.k);
-    var i, k, index, objects, dx, dy, dz;
-    var near = this.neighborhood;
-    
-    for (i=0; i<near.length; i+=3) {
-        dx = near[i];
-        dy = near[i+1];
-        dz = near[i+2];
-        index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
-        objects = this.cells[index];
-        if (objects) {
-            for (k=0; k<objects.length; k++) {
-                if (!collisionMask[obj.id] || !collisionMask[obj.id][objects[k].id])
-                    fn(objects[k]);
-            }
-        }
-    }
-};
+    var validCollObjs = [];
+    var near = this.neighbourhood;    
 
-make3dIndex.prototype.mapObjectsInRadiusAroundObject = function (obj, fn, collisionMask) { 
-    var x = obj.pos[0];
-    var y = obj.pos[1];
-    var z = obj.pos[2];
-    var cx = Math.floor(x * this.k)+this.xsize;
-    var cy = Math.floor(y * this.k)+this.ysize;
-    var cz = Math.floor(z * this.k);
-    var i, k, index, objects, dx, dy, dz;
-    var near = this.neighborhood;
-    
-    for (i=0; i<near.length; i+=3) {
+    for (i=3; i<near.length; i+=3) {
         dx = near[i];
         dy = near[i+1];
         dz = near[i+2];
@@ -491,16 +472,33 @@ make3dIndex.prototype.mapObjectsInRadiusAroundObject = function (obj, fn, collis
         if (objects) {
             for (k=0; k<objects.length; k++) {
                 var other = objects[k];
-                if (!collisionMask[obj.id][other.id])
-                    fn(other);
+                if (!collisionMask[obj.id][other.id]) {
+                    validCollObjs.push(other);
+                    if (!this.neighbourCache[other.id])
+                        this.neighbourCache[other.id] = [obj];
+                    else
+                        this.neighbourCache[other.id].push(obj);
+                }
             }
+        }
+    }
+    if (validCollObjs.length > 0)
+        this.neighbourCache[obj.id] = validCollObjs;
+};
+
+make3dIndex.prototype.mapObjectsInRadiusAroundObject = function (obj, fn, collisionMask) {    
+    var cache = this.neighbourCache[obj.id];
+    if (cache) {
+        var k;
+        for (k=0; k<cache.length; k++) {
+            fn(cache[k]);
         }
     }
 };
 
 make3dIndex.prototype.removeObject = function(obj, index) {
     
-    var k, index, objects;
+    var k, j, index, objects;
     
     if (!index) {
         var pos = obj.ppos;
@@ -524,163 +522,54 @@ make3dIndex.prototype.removeObject = function(obj, index) {
         var k;
         for (k=objects.length-1; k>=0; k--) {
             var pb = objects[k];
-            if (pb.id == obj.id) {
+            if (pb == obj) {
                 objects.splice(k,1);
             }
         }
     }
-};
-
-
-make3dIndex.prototype.updateIndex = function(collisionMask) {
-    var mc = 0;
-    for (var id in this.objectCache) {
-        var obj = this.objectCache[id];
-        var oldIndex = this.indexCache[id];
-        var pos = obj.pos;
-        var x = pos[0];
-        var y = pos[1];
-        var z = pos[2];
-        var cx = Math.floor(x * this.k)+this.xsize;
-        var cy = Math.floor(y * this.k)+this.ysize;
-        var cz = Math.floor(z * this.k);
-        var index = cx+cy*this.ycoeff+cz*this.zcoeff;
-        if (index != oldIndex) {
-            mc++;
-            this.removeObject(obj, oldIndex);
-            this.addObject(pos, obj, collisionMask);
-        }
-    }
-};
-
-} else {
-
-make3dIndex.prototype.addObject = function(pos, obj, collisionMask) {
-    var x = pos[0];
-    var y = pos[1];
-    var z = pos[2];
-    var cx = Math.floor(x * this.k)+this.xsize;
-    var cy = Math.floor(y * this.k)+this.ysize;
-    var cz = Math.floor(z * this.k);
-    var i, k, index, objects, dx, dy, dz;
-    var near = this.neighborhood;
     
-    index = cx+cy*this.ycoeff+cz*this.zcoeff;
-    this.objectCache[obj.id] = obj;
-    this.indexCache[obj.id] = index;
-    
-    if (this.cells[index]) {
-        this.cells[index].push(obj);
-    } else {
-        this.cells[index] = [obj];
-    }
-    
-    for (i=3; i<near.length; i+=3) {
-        dx = near[i];
-        dy = near[i+1];
-        dz = near[i+2];
-        index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
-        objects = this.cells[index];
-        /*
-        if (objects) {
-            var masked = true;
-            var k;
-            for (k=0; k<objects.length; k++) {
-                var pb = objects[k];
-                masked = masked && collisionMask[obj.id] && collisionMask[obj.id][pb.id];
-            }
-            if (true || masked) {
-                objects.push(obj);
-            }
-        */
-        if (objects) {
-            objects.push(obj);
-        } else {
-            this.cells[index] = [obj];
-        }
-    }
-};
-
-make3dIndex.prototype.removeObject = function(obj) {
-    var pos = obj.ppos;
-    var x = pos[0];
-    var y = pos[1];
-    var z = pos[2];
-    var cx = Math.floor(x * this.k)+this.xsize;
-    var cy = Math.floor(y * this.k)+this.ysize;
-    var cz = Math.floor(z * this.k);
-    var i, k, index, objects, dx, dy, dz;
-    var near = this.neighborhood;
-    
-    this.objectCache[obj.id] = false;
-    this.indexCache[obj.id] = false;
-    
-    for (i=0; i<near.length; i+=3) {
-        dx = near[i];
-        dy = near[i+1];
-        dz = near[i+2];
-        index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
-        objects = this.cells[index];
-        if (objects) {
-            var k;
-            for (k=objects.length-1; k>=0; k--) {
-                var pb = objects[k];
-                if (pb.id == obj.id) {
-                    objects.splice(k,1);
+    var cache = this.neighbourCache[obj.id];
+    if (cache) {
+        for (k=0; k<cache.length; k++) {
+            var other = cache[k];
+            var oCache = this.neighbourCache[other.id];
+            if (oCache.length == 1) {
+                this.neighbourCache[other.id] = false;
+            } else {
+                for (j=oCache.length-1; j>=0; j--) {
+                    if (oCache[j] == obj) {
+                        oCache.splice(j,1);
+                    }
                 }
             }
-            if (objects.length == 0) delete this.cells[index];
         }
     }
+    this.neighbourCache[obj.id] = false;
 };
 
-
-make3dIndex.prototype.updateIndex = function(collisionMask) {
-    var mc = 0;
-    for (var id in this.objectCache) {
-        var obj = this.objectCache[id];
-        var oldIndex = this.indexCache[id];
-        var pos = obj.pos;
-        var x = pos[0];
-        var y = pos[1];
-        var z = pos[2];
-        var cx = Math.floor(x * this.k)+this.xsize;
-        var cy = Math.floor(y * this.k)+this.ysize;
-        var cz = Math.floor(z * this.k);
-        var index = cx+cy*this.ycoeff+cz*this.zcoeff;
-        if (index != oldIndex) {
-            mc++;
-            this.removeObject(obj);
-            this.addObject(pos, obj, collisionMask);
-        }
-    }
-};
-
-make3dIndex.prototype.mapObjectsInRadius = function (x, y, z, fn) {
+make3dIndex.prototype.updateObj = function(obj, collisionMask) {
+    var id = obj.id;
+    var oldIndex = this.indexCache[id];
+    var pos = obj.pos;
+    var x = pos[0];
+    var y = pos[1];
+    var z = pos[2];
     var cx = Math.floor(x * this.k)+this.xsize;
     var cy = Math.floor(y * this.k)+this.ysize;
     var cz = Math.floor(z * this.k);
-    var k;
-    var i = cx+cy*this.ycoeff+cz*this.zcoeff;
-    var list = this.cells[i];
-    if (list) {
-        for (k=0; k<list.length; k++) {
-            fn(list[k]);
-        }
+    var index = cx+cy*this.ycoeff+cz*this.zcoeff;
+    if (index != oldIndex) {
+        this.removeObject(obj, oldIndex);
+        this.addObject(pos, obj, collisionMask);
     }
 };
 
-make3dIndex.prototype.mapObjectsInRadiusAroundObject = function (obj, fn, collisionMask) {    
-    var i = this.indexCache[obj.id];
-    var list = this.cells[i];
-    if (list) {
-        for (k=0; k<list.length; k++) {
-            if (!collisionMask[obj.id] || !collisionMask[obj.id][list[k].id])
-                fn(list[k]);
-        }
+make3dIndex.prototype.updateIndex = function(collisionMask) {
+    for (var id in this.objectCache) {
+        var obj = this.objectCache[id];
+        this.updateObj(obj, collisionMask);
     }
 };
-}
 
 function test3dIndex() {
     var N = 500000;

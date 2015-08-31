@@ -134,22 +134,6 @@ function computeCollision(pa, pb) {
             
             if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal, temp2), pb.pos);
             if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal, temp2), pa.pos);
-            
-            /*
-            if (window.collisionForce) {                                
-                var force = scalXvec(collK*penetration, normal);
-                addVecs(pa.force, force, pa.force);
-                var force = scalXvec(-1, force, force);
-                addVecs(pb.force, force, pb.force);
-            } else {
-            }
-            
-            var ma = pa.mass;
-            var mb = pb.mass;
-            var J = -(1+0.3)*dotVecs(subVecs(pa.v, pb.v), normal)/((1/ma+1/mb));
-            addVecs(pa.v, scalXvec(J/ma, normal), pa.v);
-            addVecs(pb.v, scalXvec(J/mb, normal), pb.v);
-            */
         }
     }
 }
@@ -188,8 +172,8 @@ function makeSimWorld(settings) {
     world.springs = [];
     world.pIdCounter = 0;
     world.connIndex = [];
-    //if (indexCellSpreading) world.index3d = new make3dIndex(1.05,100,100,100);
-    world.index3d = new make3dIndex(1.05,100,100,100);
+    
+    world.index3d = new make3dIndex(1.01,100,100,100);
                 
     world.addSoftBody = function(body) {
         var i;
@@ -208,11 +192,11 @@ function makeSimWorld(settings) {
             }
             this.connIndex[spring.pb.id][spring.pa.id] = true;
         }
-        //if (indexCellSpreading)
-            for (i=0; i<body.points.length; i++) {
-                var point = body.points[i];
-                this.index3d.addObject(point.pos, point, this.connIndex);
-            }
+        
+        for (i=0; i<body.points.length; i++) {
+            var point = body.points[i];
+            this.index3d.addObject(point.pos, point, this.connIndex);
+        }
         util.pushBack(this.points, body.points);
         util.pushBack(this.springs, body.springs);
     };
@@ -231,41 +215,22 @@ function makeSimWorld(settings) {
             util.arrayShuffle(this.points, pseudoRandom);
             var collStartIndexT = Date.now();
             var collK = world.collisionK;
-                        
+            
             if (this.collisionIndex) {
-                
-                //if (indexCellSpreading) {
-                this.index3d.updateIndex(this.connIndex);
-                
-                /*
-                } else {
-                    this.index3d = new make3dIndex(1.1,100,100,100);
-                    for (i=0; i<this.points.length; i++) {
-                        var p = this.points[i];
-                        this.index3d.addObject(p.pos, p, this.connIndex);
-                    }
-                }
-                */
-                
+                this.index3d.updateIndex(this.connIndex);                
             }
             
             var collStartT = Date.now();
             
+            var that = this;
             if (this.collisionIndex) {
                 for (i=0; i<this.points.length; i++) {
                     pa = this.points[i];
-                    
-                    if (indexCellSpreading) {
-                        this.index3d.mapObjectsInRadiusAroundObject(pa,
-                            function(pb) {
-                                computeCollision(pa, pb);
-                            }, this.connIndex);
-                    } else {
-                        this.index3d.mapObjectsInRadiusAroundObject(pa, 
-                            function(pb) {
-                                computeCollision(pa, pb);
-                            }, this.connIndex);
-                    }
+                    this.index3d.mapObjectsInRadiusAroundObject(pa, function(pb) {
+                        computeCollision(pa, pb);
+                        that.index3d.updateObj(pa, that.connIndex);
+                        that.index3d.updateObj(pb, that.connIndex);
+                    }, this.connIndex);
                 }
             } else {
                 for (i=0; i<this.points.length; i++) {
@@ -276,7 +241,7 @@ function makeSimWorld(settings) {
                     }
                 }
             }            
-            
+                        
             this.collTime = Date.now() - collStartT;
             this.collIndexTime = collStartT - collStartIndexT;
             

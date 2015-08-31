@@ -60,9 +60,30 @@ util = {
     avgTracker: function() {
         this.x = 0;
         this.N = 0;
+    },
+    pairSet: function() {
+        this.d = {};
     }
 };
 
+//pairSet
+util.pairSet.prototype.add = function (x, y) {
+    if (!this.d[x]) this.d[x] = {};
+    this.d[x][y] = true;
+    if (!this.d[y]) this.d[y] = {};
+    this.d[y][x] = true;
+};
+
+util.pairSet.prototype.remove = function (x, y) {
+    delete this.d[x][y];
+    delete this.d[y][x];
+};
+
+util.pairSet.prototype.check = function (x, y) {
+    return this.d[x] && this.d[x][y];
+};
+
+//Avg Tracker
 util.avgTracker.prototype.update = function(next) {
     this.x += (1/(this.N+1))*(next-this.x);
     this.N++;
@@ -72,6 +93,7 @@ util.avgTracker.prototype.getRounded = function(N) {
     return Math.round(this.x*N)/N;
 };
 
+//PRNG
 util.prng.prototype.nextInt = function () {
     return this.state = this.state * 16807 % 2147483647;
 };
