@@ -134,6 +134,8 @@ function computeCollision(pa, pb) {
             
             if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*penetration, normal, temp2), pb.pos);
             if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*penetration, normal, temp2), pa.pos);
+            
+            return true;
         }
     }
 }
@@ -203,7 +205,7 @@ function makeSimWorld(settings) {
     
     world.checkBond = function(pa, pb) {
         return this.connIndex[pa.id] && this.connIndex[pa.id][pb.id];
-    };
+    };   
     
     world.step = function(dt) {
         var stepStartT = Date.now();
@@ -226,11 +228,7 @@ function makeSimWorld(settings) {
             if (this.collisionIndex) {
                 for (i=0; i<this.points.length; i++) {
                     pa = this.points[i];
-                    this.index3d.mapObjectsInRadiusAroundObject(pa, function(pb) {
-                        computeCollision(pa, pb);
-                        that.index3d.updateObj(pa, that.connIndex);
-                        that.index3d.updateObj(pb, that.connIndex);
-                    }, this.connIndex);
+                    this.index3d.updateObjectsInRadiusAroundObject(pa, computeCollision, this.connIndex);
                 }
             } else {
                 for (i=0; i<this.points.length; i++) {

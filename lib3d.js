@@ -463,7 +463,7 @@ make3dIndex.prototype.addObject = function(pos, obj, collisionMask) {
     var validCollObjs = [];
     var near = this.neighbourhood;    
 
-    for (i=3; i<near.length; i+=3) {
+    for (i=0; i<near.length; i+=3) {
         dx = near[i];
         dy = near[i+1];
         dz = near[i+2];
@@ -472,7 +472,7 @@ make3dIndex.prototype.addObject = function(pos, obj, collisionMask) {
         if (objects) {
             for (k=0; k<objects.length; k++) {
                 var other = objects[k];
-                if (!collisionMask[obj.id][other.id]) {
+                if (obj != other && !collisionMask[obj.id][other.id]) {
                     validCollObjs.push(other);
                     if (!this.neighbourCache[other.id])
                         this.neighbourCache[other.id] = [obj];
@@ -486,36 +486,31 @@ make3dIndex.prototype.addObject = function(pos, obj, collisionMask) {
         this.neighbourCache[obj.id] = validCollObjs;
 };
 
-make3dIndex.prototype.mapObjectsInRadiusAroundObject = function (obj, fn, collisionMask) {    
+make3dIndex.prototype.updateObjectsInRadiusAroundObject = function (obj, fn, collisionMask) {    
     var cache = this.neighbourCache[obj.id];
     if (cache) {
         var k;
         for (k=0; k<cache.length; k++) {
-            fn(cache[k]);
+            var updated = fn(cache[k], obj);
+            if (updated) {
+                this.updateObj(cache[k], collisionMask);
+                this.updateObj(obj, collisionMask);
+            }
         }
     }
 };
 
 make3dIndex.prototype.removeObject = function(obj, index) {
     
-    var k, j, index, objects;
+    var j, k;
     
-    if (!index) {
-        var pos = obj.ppos;
-        var x = pos[0];
-        var y = pos[1];
-        var z = pos[2];
-        var cx = Math.floor(x * this.k)+this.xsize;
-        var cy = Math.floor(y * this.k)+this.ysize;
-        var cz = Math.floor(z * this.k);
-        index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
-    }
+    index = index || this.indexCache[obj.id];
     
-    this.objectCache[obj.id] = false;
-    this.indexCache[obj.id] = -1;
+    delete this.objectCache[obj.id];
+    this.indexCache[obj.id] = 0;
     
-    objects = this.cells[index];
-
+    var objects = this.cells[index];
+    
     if (objects.length == 1) {
         delete this.cells[index];
     } else {
@@ -572,31 +567,46 @@ make3dIndex.prototype.updateIndex = function(collisionMask) {
 };
 
 function test3dIndex() {
-    var N = 500000;
+    var N = 10000;
     var L = 1.0;
-    var w = 100;
-    var h = 100;
-    var d = 100;
+    var w = 10;
+    var h = 10;
+    var d = 10;
     var side = 1.05;
     var balls = [];
     var i,j;
     var random = Math.random;
-    
-    var index = new make3dIndex(side, w+2, h+2);
+        
+    var index = new make3dIndex(side, w+5, h+5);
+    var mask = [];
     
     for (i=0; i<N; i++) {
-        var ball = {pos: [random()*w, random()*h, random()*d]}
+        var ball = {pos: [random()*w, random()*h, random()*d], id: i};
         balls.push(ball);
+        mask[i] = {};
+    }
+        
+    var t1 = Date.now();
+    
+    for (i=0; i<N; i++) {
+        index.addObject(balls[i].pos, balls[i], mask);
     }
     
-    var x = random()*w;
-    var y = random()*h;
-    var z = random()*d;
+    //Shuffle balls
+    var Ns = Math.floor(N*0.7);
+    for (i=0; i<Ns; i++) {
+        balls[i].pos = [random()*w, random()*h, random()*d];
+    }
     
-    var center = [x,y,z];
+    index.updateIndex(mask);
+       
+    var t2 = Date.now();
+    
+    var testIndex = Math.floor(N/2);
+    var testBall = balls[testIndex];
+    
+    var center = testBall.pos;
     console.log('center = '+center);
-    
-    var t1 = Date.now();
     
     var ballsTest = [];
     
@@ -604,26 +614,20 @@ function test3dIndex() {
     
     for (j=0; j<balls.length; j++) {
         var ball = balls[j];
-        if (distSquareVec3(ball.pos, center) < L*L) {
+        if (j != testIndex && distSquareVec3(ball.pos, center) < L*L) {
             ballsTest.push(ball);
         }
-    }
-    
-    var t2 = Date.now();
-    
-    for (i=0; i<N; i++) {
-        index.addObject(balls[i].pos, balls[i]);
     }
     
     var t3 = Date.now();
     
     var result = [];
-
-    index.mapObjectsInRadius(center[0], center[1], center[2], function(ball) {
-        if (distSquareVec3(ball.pos, center) < L*L) {
-            result.push(ball);
+    
+    index.updateObjectsInRadiusAroundObject(testBall, function(ballA, ballB) {
+        if (distSquareVec3(ballA.pos, ballB.pos) < L*L) {
+            result.push(ballA);
         }
-    });
+    }, mask);
     
     var t4 = Date.now();
     
@@ -633,7 +637,13 @@ function test3dIndex() {
             
     var fail = false;
     
-    if (result.length != ballsTest.length) { console.log('Index test failed: length difference '+result.length+' '+ballsTest.length); fail = true; return };
+    if (result.length != ballsTest.length) {
+        console.log('Index test failed: length difference '+result.length+' '+ballsTest.length);
+        fail = true;
+        console.log(JSON.stringify(result.map(function (x) { return x.id })));
+        console.log(JSON.stringify(ballsTest.map(function (x) { return x.id })));
+        return
+   };
     
     for (i=0; i<Math.max(result.length, ballsTest.length); i++) {
         if (!compareVec3(result[i].pos, ballsTest[i].pos)) {
@@ -642,9 +652,14 @@ function test3dIndex() {
         }
     }
     
-    if (!fail) { console.log('Index3d tests passed, time \nreference get:'+((t2-t1)/1000)+'\nindexed insert:'+((t3-t2)/1000)+' get:'+((t4-t3)/1000)); }
+    if (!fail) { console.log('Index3d tests passed: got '+result.length+' objs, time \nreference get:'+((t3-t2)/1000)+'\nindexed insert & shuffle:'+((t2-t1)/1000)+' get:'+((t4-t3)/1000)); }
 }
 
 try { if (GLOBAL) {
-    test3dIndex();
+    for (var i=0; i<1; i++) {
+        try {
+            test3dIndex();
+        } catch (e) { console.log(e) }
+    }
 } } catch (e) {}
+
