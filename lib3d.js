@@ -302,12 +302,48 @@ function quaternionToAxisAngle(q, res) {
     return res;
 }
 
+function testQuaternions() {
+    var a = normalize([Math.random()-0.5, Math.random()-0.5, Math.random()-0.5]);
+    var phi = (Math.random()-0.5)*Math.PI;
+    var ra = makeQuaternionRotation(a, phi);
+    var ra2 = makeQuaternionRotation(a, phi*2);
+    var rara = mulQuats(ra, ra);
+    
+    var test = [Math.random()-0.5, Math.random()-0.5, Math.random()-0.5];
+    
+    var a = applyQuaternionRotation(ra, applyQuaternionRotation(ra, test));
+    var b = applyQuaternionRotation(ra2, test);
+    var c = applyQuaternionRotation(rara, test);
+    //var d = rotateAxisAngle(a, phi*2, test);
+    
+    if (distVec3(a,b) > epsilon || distVec3(a,c) > epsilon || distVec3(b,c) > epsilon ) {
+         // || distVec3(b,d) > epsilon) {
+        console.log("Quaternion tests FAILED");
+        console.log(a);
+        console.log(b);
+        console.log(c);
+        //console.log(d);
+    } else {
+        console.log("Quaternion tests passed");
+    }
+}
+
+//Geometry intersections
+function rayBallIntersect(src, normal, ballPos, ballRad) {
+    var relCoord = subVecs(ballPos, src);
+    var proj = dotVecs(relCoord, normal);
+    var rayProj = scalXvec(proj, normal);
+    var tangentLen = distSquareVec3(rayProj, relCoord);
+    if (tangentLen < ballRad*ballRad) {
+        return true;
+    }
+}
 
 //Orthographic camera
 function makeCamera(position, alpha, beta, screenW, screenH, scale) {
     var camera = {pos: position};
     
-    camera.refTop = [0,0,1];
+    camera.refForward = [0,0,-1];
     camera.refRight = [1,0,0];
     
     camera.updateTransform = function (alpha, beta, screenW, screenH, scale) {
@@ -318,19 +354,27 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         if (util.isNumeric(screenH)) this.screenH = screenH;
         if (util.isNumeric(scale)) this.scale = scale;
                 
-        this.rotTop = makeQuaternionRotation(this.refTop, -this.alpha);
+        this.rotForward = makeQuaternionRotation(this.refForward, -this.alpha);
         this.rotRight = makeQuaternionRotation(this.refRight, -this.beta);
         
-        this.right = applyQuaternionRotation(this.rotTop, this.refRight);        
-        this.top = applyQuaternionRotation(this.rotRight, this.refTop);
+        this.irotForward = makeQuaternionRotation(this.refForward, this.alpha);
+        this.irotRight = makeQuaternionRotation(this.refRight, this.beta);
         
-        this.forward = crossVecs(this.top, this.right);
+        this.rotation = mulQuats(this.rotRight,this.rotForward);
+        this.irotation = mulQuats(this.irotForward,this.irotRight);
+        
+        this.right = applyQuaternionRotation(this.irotForward, this.refRight);        
+        this.forward = applyQuaternionRotation(this.irotation, this.refForward);
+        
+        this.top = crossVecs(this.right, this.forward);
         this.planeForward = normalize(makeVec3(this.forward[0], this.forward[1], 0));
-        this.planeRight = normalize(crossVecs(this.planeForward, this.top));
+        this.planeRight = normalize(makeVec3(this.right[0], this.right[1], 0));        
         
-        this.rotation = mulQuats(this.rotRight,this.rotTop);
-        
-        this.screenScaling = Math.min(this.screenW,this.screenH)*this.scale;
+        if (this.screenW < this.screenH) {
+            this.screenScaling = this.screenW*this.scale;
+        } else {
+            this.screenScaling = this.screenH*this.scale;
+        }
         
         this.screenMatrix = makeMatrix(3,3,
             [this.screenScaling,0,0,
@@ -340,6 +384,12 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         this.matrix = matXmat(quaternionToRotMatrix(this.rotation), this.screenMatrix);
         
         this.trans = this.pos;
+        
+        console.log("scale", this.scale);
+        console.log("screenScaling", this.screenScaling);
+        console.log("scrXrange", this.scrXrange);
+        console.log("scrYrange", this.scrYrange);
+        
     };
     
     camera.zoom = function(delta) {
@@ -356,9 +406,16 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         this.updateTransform();
     };
     
-    camera.getRayFromScreen = function(screenX, screenY, res) {
-        res = res || makeVec3(0,0,0);
-        
+    camera.getRayFromScreen = function(screenX, screenY) {
+        var size = Math.min(this.screenW,this.screenH);
+        var nX = (screenX-0.5*this.screenW)/this.screenScaling;
+        var nY = ((this.screenH-screenY)-0.5*this.screenH)/this.screenScaling;
+
+        var res = {normal: this.forward, source: addArrOfVecs([
+                    this.pos,
+                    scalXvec(nX, this.right),
+                    scalXvec(nY, this.top)])};
+        return res;
     };
     
     camera.updateTransform(alpha, beta, screenW, screenH, scale);
@@ -373,8 +430,6 @@ function applyCameraTransform(camera, vec, res) {
     matXvec(camera.matrix, temp, res);
     return res;
 }
-
-indexCellSpreading = false;
 
 function make3dIndex(cellSide, xsize, ysize) {
     var index = this;
@@ -661,5 +716,6 @@ try { if (GLOBAL) {
             test3dIndex();
         } catch (e) { console.log(e) }
     }
+    testQuaternions()
 } } catch (e) {}
 

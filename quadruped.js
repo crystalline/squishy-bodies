@@ -55,7 +55,7 @@ function makeLeg(config) {
     if (config.alpha) rotatePoints(legAxis, config.alpha, leg)
     translatePoints(config.origin, rotatePoints(rotAxis, rotAngle, leg));
     leg.points.forEach(function(p) {
-        p.radius = config.pradius;
+        p.r = config.pradius;
         if (config.pcolor) p.col = config.pcolor;
     });
     return leg;
@@ -212,9 +212,6 @@ function runQuadDemo() {
             hashSim(world, n)
         }
     }
-    
-    console.log("collisionIndex="+simulation.world.collisionIndex);
-    console.log("indexCellSpreading="+indexCellSpreading);
     
     runSimulationInViewer(simulation);
 }

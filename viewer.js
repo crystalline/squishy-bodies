@@ -162,6 +162,9 @@ function runSimulationInViewer(simConfig) {
     
     var camera = makeCamera([0,0,0], Math.PI/4, Math.PI/3, graphics.w, graphics.h, 0.04);  
     
+    window.camera = camera;
+    window.world = world;
+    
     //Cache for camera parameters changed by gui
     var cam = {alpha: rad2ang(camera.alpha), beta: rad2ang(camera.beta),
                scale: 0.04, x: 0, y:0, z:0};
@@ -171,6 +174,17 @@ function runSimulationInViewer(simConfig) {
     var config = {pauseSim: false, pauseRender: false, controller: true};
     
     var ac = makeAnimationController();
+    
+    function handleClick(x, y) {
+        var click = camera.getRayFromScreen(x,y);
+        console.log(click);
+        world.points.forEach(function(ball) {
+            if (rayBallIntersect(click.source, click.normal, ball.pos, ball.r)) {
+                console.log(ball);
+                world.selection[ball.id] = true;
+            }
+        });
+    }
     
     function camUpdate(value) {
         camera.needUpdate = true;
@@ -218,7 +232,7 @@ function runSimulationInViewer(simConfig) {
         var y = event.pageY;
         if (mouseDown && px && py) {
             cam.beta -= (y - py);
-            cam.alpha -= (x - px);
+            cam.alpha += (x - px);
             gui.updateManually();
             camUpdate();
         }
@@ -228,11 +242,14 @@ function runSimulationInViewer(simConfig) {
     graphics.canvas.onmousedown = function() { 
         mouseDown = 1;
     }
-    graphics.canvas.onmouseup = function() {
+    graphics.canvas.onmouseup = function(event) {
         mouseDown = 0;
         px=false;
         py=false;
+        handleClick(event.pageX, event.pageY);
     }
+    
+    rayBallIntersect
     
     //Keyboard event handling
     function getChar(event) {
@@ -248,18 +265,21 @@ function runSimulationInViewer(simConfig) {
     }
     var camMoved = false;
     var movekeys = {
-        "W":[0,1,0],
-        "S":[0,-1,0],
-        "A":[-1,0,0],
-        "D":[1,0,0]
+        "W":[1,0,0],
+        "S":[-1,0,0],
+        "A":[0,-1,0],
+        "D":[0,1,0]
     };
     window.addEventListener("keydown", function(event) {
         var char = getChar(event);
         var vec = movekeys[char];
         if (vec && !camera.posUpdate) {
-            var delta = scalXvec(1, addArrOfVecs( [scalXvec(vec[0],camera.planeForward), scalXvec(vec[1],camera.planeRight), scalXvec(vec[2],camera.refTop) ] ));
-            cam.x += delta[1];
-            cam.y += delta[0];
+            var delta = scalXvec(1, addArrOfVecs( [
+                scalXvec(vec[0], camera.planeForward),
+                scalXvec(vec[1], camera.planeRight),
+                scalXvec(vec[2], camera.refForward) ] ));
+            cam.x += delta[0];
+            cam.y += delta[1];
             cam.z += 0;
             gui.updateManually();
             camUpdate();
@@ -292,6 +312,15 @@ function runSimulationInViewer(simConfig) {
         if (camera.needUpdate) { 
             camera.needUpdate = false;
             camera.updateTransform();
+            /*
+            console.log("top", camera.top); 
+            console.log("right", camera.right);
+            console.log("forward", camera.forward);
+            console.log("planeForward", camera.planeForward);
+            console.log("planeRight", camera.planeRight);
+            console.log("refForward", camera.refForward);
+            console.log("refRight", camera.refRight);
+            */
         }
         if (!config.pauseSim) {
             var simDt = simConfig.simDt;
@@ -318,7 +347,8 @@ function runSimulationInViewer(simConfig) {
         var frameT = time - prevFrameT;
         
         var stats = [Math.round(1000/(frameT))+' fps',
-                     (Math.round(world.measureEnergy()*10)/10)+ ' energy'];
+                     (Math.round(world.measureEnergy()*10)/10)+ ' energy',
+                     timestep+ ' timestep'];
         if (util.isNumeric(world.collIndexTime))
             stats.push( 'collision indexing '+(world.collIndexTime)+' ms' );
         if (util.isNumeric(world.collTime))
@@ -326,7 +356,8 @@ function runSimulationInViewer(simConfig) {
         if (util.isNumeric(world.prevStepTime))
             stats.push( 'cpu time per step '+(world.prevStepTime)+' ms'+', avg '+avgStep.getRounded(1)+' ms');
         stats.push(world.points.length+' atoms '+world.springs.length+' bonds');
-        graphics.drawText(stats, 10, 10);
+        
+        if (!config.pauseRender) graphics.drawText(stats, 10, 10);
         
         prevFrameT = time;
         timestep++;

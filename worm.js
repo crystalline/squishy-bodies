@@ -37,7 +37,7 @@ function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
     translatePoints(makeVec3(-L*dist/2,0,2), body);
     
     if (pradius) body.points.forEach(function(p) {
-        p.radius = pradius;
+        p.r = pradius;
     });
     
     return body;

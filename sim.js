@@ -121,8 +121,8 @@ function integratePointVerlet(point, dt) {
 
 function computeCollision(pa, pb) {
     if (pa != pb) {
-        var ra = pa.radius;
-        var rb = pb.radius;
+        var ra = pa.r;
+        var rb = pb.r;
         var diff = subVecs(pb.pos, pa.pos, temp);
         var length = l2norm(diff);
         var critlen = ra+rb;
@@ -174,6 +174,7 @@ function makeSimWorld(settings) {
     world.springs = [];
     world.pIdCounter = 0;
     world.connIndex = [];
+    world.selection = {};
     
     world.index3d = new make3dIndex(1.01,100,100,100);
                 
@@ -288,7 +289,24 @@ function makeSimWorld(settings) {
         return pa.scrPos[2] - pb.scrPos[2];
     }
     
+    function drawReference(camera, screen) {       
+        var ref = [[1,0,0],[0,1,0],[0,0,1]];
+        var colors = ["#FF0000","#00FF00","#0000FF"];
+        var scrPos = [0,0,0];
+        var zero = [0,0,0];
+        applyCameraTransform(camera, scrPos, zero);
+        
+        var i;
+        
+        for (i=0; i<ref.length; i++) {
+            applyCameraTransform(camera, ref[i], scrPos);
+            screen.drawCircle(scrPos[0], scrPos[1], camera.screenScaling*0.1, undefined, colors[i]);
+            screen.drawLine(scrPos[0], scrPos[1], zero[0], zero[1], 3, colors[i]);
+        }    
+    }
+    
     function drawGrid(camera, screen, Ngrid, gStep, gridW) {   
+        
         var gridA = makeVec3(0,0,0);
         var gridB = makeVec3(0,0,0);
         var ptA = makeVec3(0,0,0);
@@ -304,7 +322,6 @@ function makeSimWorld(settings) {
             screen.drawLine(ptA[0],ptA[1],ptB[0],ptB[1],gridW);
             gridA[0]+=gStep;
             gridB[0]+=gStep;
-
         }
         
         gridA[0] = -(Ngrid*gStep/2);
@@ -322,7 +339,7 @@ function makeSimWorld(settings) {
     
     world.draw = function(camera, screen) {
         var ptW = this.pointWidth, lineW = this.lineWidth, gridW = this.gridWidth;
-        var i, pt, width, spr, ptA, ptB;
+        var i, pt, width, fill, color, spr, ptA, ptB;
         
         for (i=0; i<this.points.length; i++) {
             pt = this.points[i];
@@ -334,8 +351,14 @@ function makeSimWorld(settings) {
             for (i=0; i<this.points.length; i++) {
                 pt = this.points[i];
                 width = ptW;
-                if (pt.radius) width = camera.screenScaling*pt.radius;
-                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, 1, pt.color);
+                fill = 1;
+                color = pt.color
+                if (pt.r) width = camera.screenScaling*pt.r;
+                if (this.selection[pt.id]) { 
+                    fill = undefined;
+                    color = "#AA1111";
+                }
+                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, fill, color);
             }
         }
         
@@ -349,6 +372,7 @@ function makeSimWorld(settings) {
         }
         
         drawGrid(camera, screen, 10, 10, gridW);
+        drawReference(camera, screen);
     };
     
     return world;
