@@ -175,7 +175,7 @@ function runSimulationInViewer(simConfig) {
     
     var ac = makeAnimationController();
     
-    var editor = {selRadius:0.0};
+    var editor = {selRadius:0.1, instantMove: false};
     
     function handleClick(x, y) {
         var click = camera.getRayFromScreen(x,y);
@@ -206,7 +206,9 @@ function runSimulationInViewer(simConfig) {
     gui.add(cam, "x").onChange(camUpdate);
     gui.add(cam, "y").onChange(camUpdate);
     gui.add(cam, "z").onChange(camUpdate);
-    gui.add(editor, "selRadius");
+    gui.add(editor, "selRadius", 0.0, 10.0);
+    gui.add(editor, "instantMove");
+    editor.selRadius = 0;
     
     gui.updateManually = function() {
         var gui = this;
@@ -215,6 +217,8 @@ function runSimulationInViewer(simConfig) {
             gui.__controllers[i].updateDisplay();
         }
     };
+    
+    gui.updateManually();
     
     function scaleCam(s) {
         cam.scale *= (1+s);
@@ -234,6 +238,7 @@ function runSimulationInViewer(simConfig) {
     var mouseDown = 0;
     var px=false;
     var py=false;
+    var mouseWorldMove = false;
     
     //Keyboard modifiers
     var mods = {};
@@ -254,8 +259,48 @@ function runSimulationInViewer(simConfig) {
         handleEvent(event);
         var x = event.pageX;
         var y = event.pageY;
-        if (mouseDown && px && py) {
-            rotCam((x - px), (y - py));
+        //Move atoms
+        if (mods.shift && mouseDown && px && py) {
+            var ray = camera.getRayFromScreen(x,y);
+            if (!mouseWorldMove) {
+                mouseWorldMove = ray.scrSource;
+            } else {
+                var i;
+                var deltaPos = subVecs(ray.scrSource, mouseWorldMove);
+                
+                //Move points parallel to screen plane by camera-space mouse movement delta
+                for (i=0; i<world.points.length; i++) {
+                    var p = world.points[i];
+                    if (world.selection[p.id]) {
+                        if (editor.instantMove) {
+                            addVecs(p.pos, deltaPos, p.pos);
+                            copyVec3(p.pos, p.ppos);
+                        } else {
+                            addVecs(p.pos, deltaPos, p.pos);
+                            p.pos[2] = Math.max(0, p.pos[2]);
+                        }
+                    }
+                }
+                
+                //Damp excess velocity if moving in physical mode
+                if (editor.instantMove)
+                for (i=0; i<world.points.length; i++) {
+                    var p = world.points[i];
+                    var dpos = subVecs(p.pos, p.ppos);
+                    var dist = l2norm(dpos);
+                    var maxDist = 0.5;
+                    if (dist > maxDist) {
+                        addVecs(p.ppos, scalXvec(dist-maxDist, dpos), p.ppos);
+                    }
+                }                       
+                
+                mouseWorldMove = ray.scrSource;
+            }
+        } else {
+            //Rotate camera
+            if (!mods.ctrl && mouseDown && px && py) {
+                rotCam((x - px), (y - py));
+            }
         }
         px = x;
         py = y;
@@ -270,13 +315,14 @@ function runSimulationInViewer(simConfig) {
         py=false;
         handleEvent(event);
         if (mods.ctrl) handleClick(event.pageX, event.pageY);
+        if (mouseWorldMove) mouseWorldMove = false;
     }
     
     var specialCodes = {
         109: "-",
         189: "-",
+        107: "+",
         187: "+",
-        220: "+",
         37: "left",
         38: "up",
         39: "right",
@@ -289,6 +335,7 @@ function runSimulationInViewer(simConfig) {
     function getChar(event) {
         mods.ctrl = event.controlKey;
         mods.shift = event.shiftKey;
+        //console.log(event.keyCode);
         if (specialCodes[event.keyCode]) return specialCodes[event.keyCode];
         if (event.which != 0) {
             if (event.which < 32) return null;
@@ -305,20 +352,22 @@ function runSimulationInViewer(simConfig) {
         "D":[0,1,0]
     };
     
-    var rotConst = 360/(16*Math.PI*2);
+    var rotConst = rad2ang(0.1);
+    var scalConst = 0.1;
     
     window.addEventListener("keydown", function(event) {
         handleEvent(event);
         var char = getChar(event);
         
-        if (char == "+") { scaleCam(0.1); return }
-        if (char == "-") { scaleCam(-0.1); return }   
+        if (char == "+") { scaleCam(scalConst); return }
+        if (char == "-") { scaleCam(-scalConst); return }   
         if (char == "left") { rotCam(rotConst, 0); return }
         if (char == "right") { rotCam(-rotConst, 0); return }
         if (char == "up") { rotCam(0, rotConst); return }
         if (char == "down") { rotCam(0, -rotConst); return }
         if (char == "escape") { world.selection = {} }
         if (char == "delete") { world.deletePointByIds(world.selection); world.selection = {}; }
+        if (char == "F") { world.floodFillSelection() };
         
         var vec = movekeys[char];
         if (vec && !camera.posUpdate) {

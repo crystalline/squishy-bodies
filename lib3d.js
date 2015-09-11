@@ -406,11 +406,11 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         var size = Math.min(this.screenW,this.screenH);
         var nX = (screenX-0.5*this.screenW)/this.screenScaling;
         var nY = ((this.screenH-screenY)-0.5*this.screenH)/this.screenScaling;
-
-        var res = {normal: this.forward, source: addArrOfVecs([
-                    this.pos,
-                    scalXvec(nX, this.right),
-                    scalXvec(nY, this.top)])};
+        var scrSource = addArrOfVecs([ scalXvec(nX, this.right), scalXvec(nY, this.top)]);
+        
+        var res = {normal: this.forward,
+                   scrSource: scrSource,
+                   source: addArrOfVecs([this.pos, scrSource])};
         return res;
     };
     

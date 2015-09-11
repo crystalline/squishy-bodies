@@ -204,6 +204,24 @@ function makeSimWorld(settings) {
         util.pushBack(this.springs, body.springs);
     };
     
+    world.floodFillSelection = function () {
+        var visited = {};
+        var updated = false;
+        while (true) {
+            updated = false;
+            for (id in this.selection) {
+                if (!visited[id]) {
+                    for (neighbor in this.connIndex[id]) {
+                        this.selection[neighbor] = true;
+                    }
+                    visited[id] = true;
+                    updated = true;
+                }
+            }
+            if (!updated) break;
+        }
+    };
+        
     world.deletePointByIds = function(idDict) {
         var i;
         for (i=this.points.length-1; i>=0; i--) {
@@ -211,7 +229,7 @@ function makeSimWorld(settings) {
             if (idDict[p.id]) {
                 this.index3d.removeObject(p);
                 this.points.splice(i,1);
-                delete this.connIndex[p.id];
+                this.connIndex[p.id] && delete this.connIndex[p.id];
             }
         }
         for (i=this.springs.length-1; i>=0; i--) {
@@ -219,8 +237,7 @@ function makeSimWorld(settings) {
             if (idDict[s.pa.id]) {
                 this.springs.splice(i,1);
                 this.connIndex[s.pb.id] && delete this.connIndex[s.pb.id][s.pa.id];
-            }
-            if (idDict[s.pb.id]) {
+            } else if (idDict[s.pb.id]) {
                 this.springs.splice(i,1);
                 this.connIndex[s.pa.id] && delete this.connIndex[s.pa.id][s.pb.id];
             }
