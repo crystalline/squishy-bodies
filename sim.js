@@ -204,6 +204,29 @@ function makeSimWorld(settings) {
         util.pushBack(this.springs, body.springs);
     };
     
+    world.deletePointByIds = function(idDict) {
+        var i;
+        for (i=this.points.length-1; i>=0; i--) {
+            var p = this.points[i];
+            if (idDict[p.id]) {
+                this.index3d.removeObject(p);
+                this.points.splice(i,1);
+                delete this.connIndex[p.id];
+            }
+        }
+        for (i=this.springs.length-1; i>=0; i--) {
+            var s = this.springs[i];
+            if (idDict[s.pa.id]) {
+                this.springs.splice(i,1);
+                this.connIndex[s.pb.id] && delete this.connIndex[s.pb.id][s.pa.id];
+            }
+            if (idDict[s.pb.id]) {
+                this.springs.splice(i,1);
+                this.connIndex[s.pa.id] && delete this.connIndex[s.pa.id][s.pb.id];
+            }
+        }
+    };
+    
     world.checkBond = function(pa, pb) {
         return this.connIndex[pa.id] && this.connIndex[pa.id][pb.id];
     };   

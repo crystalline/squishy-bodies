@@ -328,13 +328,14 @@ function testQuaternions() {
     }
 }
 
-//Geometry intersections
-function rayBallIntersect(src, normal, ballPos, ballRad) {
+//Check ball and 3d-cylinder for intersection (when rayRadius == 0 cylinder becomes a ray)
+function rayBallIntersect(src, normal, rayRadius, ballPos, ballRad) {
+    rayRadius = rayRadius || 0;
     var relCoord = subVecs(ballPos, src);
     var proj = dotVecs(relCoord, normal);
     var rayProj = scalXvec(proj, normal);
     var tangentLen = distSquareVec3(rayProj, relCoord);
-    if (tangentLen < ballRad*ballRad) {
+    if (tangentLen < (ballRad+rayRadius)*(ballRad+rayRadius)) {
         return true;
     }
 }
@@ -384,11 +385,6 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         this.matrix = matXmat(quaternionToRotMatrix(this.rotation), this.screenMatrix);
         
         this.trans = this.pos;
-        
-        console.log("scale", this.scale);
-        console.log("screenScaling", this.screenScaling);
-        console.log("scrXrange", this.scrXrange);
-        console.log("scrYrange", this.scrYrange);
         
     };
     

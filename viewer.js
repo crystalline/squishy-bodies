@@ -175,12 +175,12 @@ function runSimulationInViewer(simConfig) {
     
     var ac = makeAnimationController();
     
+    var editor = {selRadius:0.0};
+    
     function handleClick(x, y) {
         var click = camera.getRayFromScreen(x,y);
-        console.log(click);
         world.points.forEach(function(ball) {
-            if (rayBallIntersect(click.source, click.normal, ball.pos, ball.r)) {
-                console.log(ball);
+            if (rayBallIntersect(click.source, click.normal, editor.selRadius, ball.pos, ball.r)) {
                 world.selection[ball.id] = true;
             }
         });
@@ -206,6 +206,7 @@ function runSimulationInViewer(simConfig) {
     gui.add(cam, "x").onChange(camUpdate);
     gui.add(cam, "y").onChange(camUpdate);
     gui.add(cam, "z").onChange(camUpdate);
+    gui.add(editor, "selRadius");
     
     gui.updateManually = function() {
         var gui = this;
@@ -215,10 +216,32 @@ function runSimulationInViewer(simConfig) {
         }
     };
     
+    function scaleCam(s) {
+        cam.scale *= (1+s);
+        if (cam.scale < 0.001) cam.scale = 0.001;
+        gui.updateManually();
+        camUpdate();
+    }
+    
+    function rotCam(dAlpha, dBeta) {
+        cam.beta -= dBeta;
+        cam.alpha += dAlpha;
+        gui.updateManually();
+        camUpdate();
+    }
+    
     //Mouse event handling
     var mouseDown = 0;
     var px=false;
     var py=false;
+    
+    //Keyboard modifiers
+    var mods = {};
+    
+    function handleEvent(event) {
+        mods.ctrl = event.ctrlKey;
+        mods.shift = event.shiftKey;
+    }
     
     window.addEventListener("resize", function() {
         graphics.resize();
@@ -228,41 +251,52 @@ function runSimulationInViewer(simConfig) {
     }, false);
     
     graphics.canvas.addEventListener("mousemove", function(event) {
+        handleEvent(event);
         var x = event.pageX;
         var y = event.pageY;
         if (mouseDown && px && py) {
-            cam.beta -= (y - py);
-            cam.alpha += (x - px);
-            gui.updateManually();
-            camUpdate();
+            rotCam((x - px), (y - py));
         }
         px = x;
         py = y;
     }, false);
-    graphics.canvas.onmousedown = function() { 
+    graphics.canvas.onmousedown = function(event) { 
         mouseDown = 1;
+        handleEvent(event);
     }
     graphics.canvas.onmouseup = function(event) {
         mouseDown = 0;
         px=false;
         py=false;
-        handleClick(event.pageX, event.pageY);
+        handleEvent(event);
+        if (mods.ctrl) handleClick(event.pageX, event.pageY);
     }
     
-    rayBallIntersect
+    var specialCodes = {
+        109: "-",
+        189: "-",
+        187: "+",
+        220: "+",
+        37: "left",
+        38: "up",
+        39: "right",
+        40: "down",
+        27: "escape",
+        46: "delete"
+    };
     
     //Keyboard event handling
     function getChar(event) {
-        if (event.which == null) { // IE
-            if (event.keyCode < 32) return null;
-            return String.fromCharCode(event.keyCode);
-        }
+        mods.ctrl = event.controlKey;
+        mods.shift = event.shiftKey;
+        if (specialCodes[event.keyCode]) return specialCodes[event.keyCode];
         if (event.which != 0) {
             if (event.which < 32) return null;
             return String.fromCharCode(event.which);
         }
         return null;
     }
+    
     var camMoved = false;
     var movekeys = {
         "W":[1,0,0],
@@ -270,8 +304,22 @@ function runSimulationInViewer(simConfig) {
         "A":[0,-1,0],
         "D":[0,1,0]
     };
+    
+    var rotConst = 360/(16*Math.PI*2);
+    
     window.addEventListener("keydown", function(event) {
+        handleEvent(event);
         var char = getChar(event);
+        
+        if (char == "+") { scaleCam(0.1); return }
+        if (char == "-") { scaleCam(-0.1); return }   
+        if (char == "left") { rotCam(rotConst, 0); return }
+        if (char == "right") { rotCam(-rotConst, 0); return }
+        if (char == "up") { rotCam(0, rotConst); return }
+        if (char == "down") { rotCam(0, -rotConst); return }
+        if (char == "escape") { world.selection = {} }
+        if (char == "delete") { world.deletePointByIds(world.selection); world.selection = {}; }
+        
         var vec = movekeys[char];
         if (vec && !camera.posUpdate) {
             var delta = scalXvec(1, addArrOfVecs( [
@@ -290,14 +338,11 @@ function runSimulationInViewer(simConfig) {
         }
     });
     window.addEventListener("keyup", function(event) {
-        
+        handleEvent(event);
     });
     window.addEventListener("mousewheel", function(event) {
         var rotation = -event.deltaY/window.innerHeight;
-        cam.scale *= (1+rotation);
-        if (cam.scale < 0.001) cam.scale = 0.001;
-        gui.updateManually();
-        camUpdate();
+        scaleCam(rotation);
     });
     
     //Mainloop
@@ -312,15 +357,6 @@ function runSimulationInViewer(simConfig) {
         if (camera.needUpdate) { 
             camera.needUpdate = false;
             camera.updateTransform();
-            /*
-            console.log("top", camera.top); 
-            console.log("right", camera.right);
-            console.log("forward", camera.forward);
-            console.log("planeForward", camera.planeForward);
-            console.log("planeRight", camera.planeRight);
-            console.log("refForward", camera.refForward);
-            console.log("refRight", camera.refRight);
-            */
         }
         if (!config.pauseSim) {
             var simDt = simConfig.simDt;
