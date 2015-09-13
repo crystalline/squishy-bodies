@@ -175,7 +175,7 @@ function runSimulationInViewer(simConfig) {
     
     var ac = makeAnimationController();
     
-    var editor = {selRadius:0.1, instantMove: false};
+    var editor = {selRadius:0.1, instantMove: true};
     
     function handleClick(x, y) {
         var click = camera.getRayFromScreen(x,y);
@@ -368,6 +368,7 @@ function runSimulationInViewer(simConfig) {
         if (char == "escape") { world.selection = {} }
         if (char == "delete") { world.deletePointByIds(world.selection); world.selection = {}; }
         if (char == "F") { world.floodFillSelection() };
+        if (char == "M") { world.minimizeSelection() };
         
         var vec = movekeys[char];
         if (vec && !camera.posUpdate) {

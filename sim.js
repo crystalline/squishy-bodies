@@ -1,6 +1,296 @@
 //Soft body simulator with anisotropic friction
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
+//3d index class
+//TODO: optimize xsize and ysize to be power of 2
+function make3dIndex(cellSide, xsize, ysize) {
+    var index = this;
+    
+    index.side = cellSide;
+    index.xsize = xsize;
+    index.ysize = ysize;
+    index.ycoeff = 2*index.xsize;
+    index.zcoeff = 4*index.xsize*index.ysize;
+    index.k = 1/index.side;
+    index.cells = {};
+    index.objectCache = {};
+    index.indexCache = {};
+    index.neighbourCache = {};
+    index.neighbourhood = new Int32Array([
+        0,0,0,
+        0,0,1,
+        1,0,1,
+        -1,0,1,
+        0,1,1,
+        0,-1,1,
+        1,1,1,
+        1,-1,1,
+        -1,1,1,
+        -1,-1,1,
+        1,0,0,
+        -1,0,0,
+        0,1,0,
+        0,-1,0,
+        1,1,0,
+        1,-1,0,
+        -1,1,0,
+        -1,-1,0,
+        0,0,-1,
+        1,0,-1,
+        -1,0,-1,
+        0,1,-1,
+        0,-1,-1,
+        1,1,-1,
+        1,-1,-1,
+        -1,1,-1,
+        -1,-1,-1
+    ]);
+    
+    return index;
+}
+
+make3dIndex.prototype.getStats = function() {
+    var i;
+    var nOccCells = 0;
+    var nBalls = new util.avgTracker();
+    var collListLen = new util.avgTracker();
+    for (var i in this.cells) {
+        nOccCells++;
+        nBalls.update(this.cells[i].length);
+    }
+    
+    var emptyCollLists = 0;
+    for (var id in this.objectCache) {
+        if (this.neighbourCache[id])
+            collListLen.update(this.neighbourCache[id].length);
+        else
+            emptyCollLists++;
+    }
+    return {avgObjsPerCell: nBalls.x, occupiedCells: nOccCells, avgCollListLen: collListLen.x, emptyCollLists: emptyCollLists};
+};
+
+make3dIndex.prototype.addObject = function(pos, obj, collisionMask) {
+    var x = pos[0];
+    var y = pos[1];
+    var z = pos[2];
+    var cx = Math.floor(x * this.k)+this.xsize;
+    var cy = Math.floor(y * this.k)+this.ysize;
+    var cz = Math.floor(z * this.k);
+    var i, k, index, objects, dx, dy, dz;
+
+    index = cx+cy*this.ycoeff+cz*this.zcoeff;
+    
+    if (!this.cells[index]) this.cells[index] = [obj];
+    else this.cells[index].push(obj);
+    
+    this.objectCache[obj.id] = obj;
+    this.indexCache[obj.id] = index;
+    this.neighbourCache[obj.id] = false;
+
+    var validCollObjs = [];
+    var near = this.neighbourhood;    
+
+    for (i=0; i<near.length; i+=3) {
+        dx = near[i];
+        dy = near[i+1];
+        dz = near[i+2];
+        index = cx+dx+(cy+dy)*this.ycoeff+(cz+dz)*this.zcoeff;
+        objects = this.cells[index];
+        if (objects) {
+            for (k=0; k<objects.length; k++) {
+                var other = objects[k];
+                if (obj != other && !collisionMask[obj.id][other.id]) {
+                    validCollObjs.push(other);
+                    if (!this.neighbourCache[other.id])
+                        this.neighbourCache[other.id] = [obj];
+                    else
+                        this.neighbourCache[other.id].push(obj);
+                }
+            }
+        }
+    }
+    if (validCollObjs.length > 0)
+        this.neighbourCache[obj.id] = validCollObjs;
+};
+
+make3dIndex.prototype.updateObjectsInRadiusAroundObject = function (obj, fn, collisionMask) {    
+    var cache = this.neighbourCache[obj.id];
+    if (cache) {
+        var k;
+        for (k=0; k<cache.length; k++) {
+            var updated = fn(cache[k], obj);
+            if (updated) {
+                this.updateObj(cache[k], collisionMask);
+                this.updateObj(obj, collisionMask);
+            }
+        }
+    }
+};
+
+make3dIndex.prototype.removeObject = function(obj, index) {
+    
+    var j, k;
+    
+    index = index || this.indexCache[obj.id];
+    
+    delete this.objectCache[obj.id];
+    this.indexCache[obj.id] = 0;
+    
+    var objects = this.cells[index];
+    
+    if (objects.length == 1) {
+        delete this.cells[index];
+    } else {
+        var k;
+        for (k=objects.length-1; k>=0; k--) {
+            var pb = objects[k];
+            if (pb == obj) {
+                objects.splice(k,1);
+            }
+        }
+    }
+    
+    var cache = this.neighbourCache[obj.id];
+    if (cache) {
+        for (k=0; k<cache.length; k++) {
+            var other = cache[k];
+            var oCache = this.neighbourCache[other.id];
+            if (oCache.length == 1) {
+                this.neighbourCache[other.id] = false;
+            } else {
+                for (j=oCache.length-1; j>=0; j--) {
+                    if (oCache[j] == obj) {
+                        oCache.splice(j,1);
+                    }
+                }
+            }
+        }
+    }
+    this.neighbourCache[obj.id] = false;
+};
+
+make3dIndex.prototype.updateObj = function(obj, collisionMask) {
+    var id = obj.id;
+    var oldIndex = this.indexCache[id];
+    var pos = obj.pos;
+    var x = pos[0];
+    var y = pos[1];
+    var z = pos[2];
+    var cx = Math.floor(x * this.k)+this.xsize;
+    var cy = Math.floor(y * this.k)+this.ysize;
+    var cz = Math.floor(z * this.k);
+    var index = cx+cy*this.ycoeff+cz*this.zcoeff;
+    if (index != oldIndex) {
+        this.removeObject(obj, oldIndex);
+        this.addObject(pos, obj, collisionMask);
+    }
+};
+
+make3dIndex.prototype.updateIndex = function(collisionMask) {
+    for (var id in this.objectCache) {
+        var obj = this.objectCache[id];
+        this.updateObj(obj, collisionMask);
+    }
+};
+
+function test3dIndex() {
+    var N = 10000;
+    var L = 1.0;
+    var w = 10;
+    var h = 10;
+    var d = 10;
+    var side = 1.05;
+    var balls = [];
+    var i,j;
+    var random = Math.random;
+        
+    var index = new make3dIndex(side, w+5, h+5);
+    var mask = [];
+    
+    for (i=0; i<N; i++) {
+        var ball = {pos: [random()*w, random()*h, random()*d], id: i};
+        balls.push(ball);
+        mask[i] = {};
+    }
+        
+    var t1 = Date.now();
+    
+    for (i=0; i<N; i++) {
+        index.addObject(balls[i].pos, balls[i], mask);
+    }
+    
+    //Shuffle balls
+    var Ns = Math.floor(N*0.7);
+    for (i=0; i<Ns; i++) {
+        balls[i].pos = [random()*w, random()*h, random()*d];
+    }
+    
+    index.updateIndex(mask);
+       
+    var t2 = Date.now();
+    
+    var testIndex = Math.floor(N/2);
+    var testBall = balls[testIndex];
+    
+    var center = testBall.pos;
+    console.log('center = '+center);
+    
+    var ballsTest = [];
+    
+    console.log(balls.length);
+    
+    for (j=0; j<balls.length; j++) {
+        var ball = balls[j];
+        if (j != testIndex && distSquareVec3(ball.pos, center) < L*L) {
+            ballsTest.push(ball);
+        }
+    }
+    
+    var t3 = Date.now();
+    
+    var result = [];
+    
+    index.updateObjectsInRadiusAroundObject(testBall, function(ballA, ballB) {
+        if (distSquareVec3(ballA.pos, ballB.pos) < L*L) {
+            result.push(ballA);
+        }
+    }, mask);
+    
+    var t4 = Date.now();
+    
+    var order = function(a,b) { if (a.pos[0] > b.pos[0]) { return 1 } else { return -1 } };
+    result.sort(order);
+    ballsTest.sort(order);
+            
+    var fail = false;
+    
+    if (result.length != ballsTest.length) {
+        console.log('Index test failed: length difference '+result.length+' '+ballsTest.length);
+        fail = true;
+        console.log(JSON.stringify(result.map(function (x) { return x.id })));
+        console.log(JSON.stringify(ballsTest.map(function (x) { return x.id })));
+        return
+   };
+    
+    for (i=0; i<Math.max(result.length, ballsTest.length); i++) {
+        if (!compareVec3(result[i].pos, ballsTest[i].pos)) {
+            console.log('Index test failed at '+i+': '+result[i].pos+' != '+ballsTest[i].pos);
+            fail = true;
+        }
+    }
+    
+    if (!fail) { console.log('Index3d tests passed: got '+result.length+' objs, time \nreference get:'+((t3-t2)/1000)+'\nindexed insert & shuffle:'+((t2-t1)/1000)+' get:'+((t4-t3)/1000)); }
+}
+
+try { if (GLOBAL) {
+    for (var i=0; i<1; i++) {
+        try {
+            //test3dIndex();
+        } catch (e) { console.log(e) }
+    }
+} } catch (e) {}
+
+//Point and spring constructors
 function makePoint(pos, mass) {
     return {pos: pos, mass: mass};
 }
@@ -50,6 +340,15 @@ function positionConstraintSolver(spring) {
     
     if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*(length-spring.l), normal, temp1), pb.pos);
     if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*(length-spring.l), normal, temp1), pa.pos);
+}
+
+function computeBondStrain(spring) {
+    var pa = spring.pa;
+    var pb = spring.pb;
+    var diff = subVecs(pb.pos, pa.pos, temp);
+    var length = l2norm(diff);
+    var delta = length-spring.l;
+    return Math.abs(delta);
 }
 
 function computeSimpleFriction(point, world) {
@@ -176,8 +475,9 @@ function makeSimWorld(settings) {
     world.connIndex = [];
     world.selection = {};
     
-    world.index3d = new make3dIndex(1.01,100,100,100);
-                
+    world.index3d = new make3dIndex(1.01,1024,1024);
+    world.objById = world.index3d.objectCache;
+    
     world.addSoftBody = function(body) {
         var i;
         for (i=0; i<body.points.length; i++) {
@@ -221,7 +521,56 @@ function makeSimWorld(settings) {
             if (!updated) break;
         }
     };
+    
+    world.minimizeSelection = function() {
+        var points = [];
+        var springs = [];
+        var i,j;
+        var bondSolver = this.springsHooke ? penaltyForceSolver : positionConstraintSolver;
         
+        for (id in this.selection) {
+            points.push(this.objById[id]);
+        }        
+        for (i=0; i<this.springs.length; i++) {
+            var spr = this.springs[i];
+            if (this.selection[spr.pa.id] && this.selection[spr.pb.id]) {
+                springs.push(spr);
+            }
+        }
+        
+        //Minimize constraints, terminate either on reaching sub-epsilon strain or iter limit
+        var epsilon = 0.001 * springs.length;
+        var strain;
+        var iterLimit = 500;
+        console.log("Start minimizing: "+springs.length+" bonds, epsilon="+epsilon+" iter limit="+iterLimit);
+        for (j=0; j<iterLimit; j++) {
+            strain = 0;
+            util.arrayShuffle(springs);
+            for (i=0; i<springs.length; i++) {
+                var spr = springs[i];
+                bondSolver(spr);
+            }
+            for (i=0; i<springs.length; i++) {
+                var spr = springs[i];
+                strain += computeBondStrain(spr);
+            }
+            if (strain < epsilon) break;
+        }
+        if (j == iterLimit) {
+            console.log("Stop minimizing by iter limit");
+        } else {
+            console.log("Stop minimizing by strain < epsilon");
+        }
+        
+        //Null point velocities to forget pre-minimization state
+        for (i=0; i<points.length; i++) {
+            var pt = points[i];
+            copyVec3(pt.pos, pt.ppos);
+        }
+        
+        return {points: points, springs: springs};
+    };
+    
     world.deletePointByIds = function(idDict) {
         var i;
         for (i=this.points.length-1; i>=0; i--) {
