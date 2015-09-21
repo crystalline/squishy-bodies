@@ -35,6 +35,7 @@ function compareVec3(va, vb) {
 }
 
 function copyVec3(src, dst) {
+    dst = dst || makeVec3(0,0,0);
     dst[0] = src[0];
     dst[1] = src[1];
     dst[2] = src[2];

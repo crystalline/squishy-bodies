@@ -87,7 +87,7 @@ function linkRings(A, B, dist, k, noCrossLink) {
             var spB = makeSpring(A.points[i], B.points[B.points.length-1], diagonalB, k); 
             springs.push(spA);
             springs.push(spB);
-            muscles[i].spa = spA;
+            muscles[i].spA = spA;
             muscles[i].da = diagonalA;
             muscles[i].spB = spB;
             muscles[i].db = diagonalB;
@@ -137,9 +137,85 @@ function makeVoxelBox(l,w,h) {
 }
 
 function makeFromVoxelArray( ) {
-
+    
 }
 
+function makeTetraTruss(center, dir, bondLen, nsegments, mass) {
+    var proj = Math.sqrt(2)/2;
+    var base = scalXvec(bondLen, makeVec3(0,0,1));
+    var bases = [
+        scalXvec(bondLen, makeVec3(0.5, 0, 0.5)),
+        scalXvec(bondLen, makeVec3(-0.5, 0, 0.5)),
+        scalXvec(bondLen, makeVec3(0,-proj,1)),
+        scalXvec(bondLen, makeVec3(0,proj,1)),
+    ];
+    
+    var points = [];
+    var springs = [];
+    
+    function link(pa, pb) {
+        springs.push({pa: pa, pb: pb, l: bondLen, k: 30});
+    }
+    
+    function pointify(v) {
+        return {mass:mass, pos:v, r:0.5};
+    }
+    
+    var i,j;
+    var top = [];
+    var next = [];
+    
+    for (j=0; j<bases.length; j++) {
+        top[j] = pointify(bases[j]);
+        next[j] = copyVec3(top[j]);
+        points.push(top[j]);
+    }
+    
+    link(top[0], top[1]);
+    
+    for (i=0; i<nsegments; i++) {
+        for (j=0; j<bases.length; j++) {
+            next[j] = pointify(addVecs(top[j].pos, base));
+            if (!(i == nsegments-1 && j > 1))
+                points.push(next[j]);
+        }
+        
+        link(top[0], top[2]);
+        link(top[1], top[2]);
+        
+        link(top[0], next[0]);
+        link(top[1], next[1]);
+        
+        link(top[2], next[0]);
+        link(top[2], next[1]);
+        
+        link(next[0], next[1]);
+        if (i<nsegments-1) link(top[2], next[2]);
+        
+        /////
+        
+        link(top[0], top[3]);
+        link(top[1], top[3]);
+        
+        link(top[0], next[0]);
+        link(top[1], next[1]);
+        
+        link(top[3], next[0]);
+        link(top[3], next[1]);
+        
+        link(next[0], next[1]);
+        if (i<nsegments-1) link(top[3], next[3]);
+        
+        top = next;
+        next = [];
+    }
+    
+    var result = {points: points, springs: springs};
+    
+    console.log(result);
+    
+    return result;
+}
 
 
 

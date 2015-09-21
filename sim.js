@@ -342,6 +342,17 @@ function positionConstraintSolver(spring) {
     if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*(length-spring.l), normal, temp1), pa.pos);
 }
 
+function positionConstraintSolverSmooth(spring, restitution) {
+    var pa = spring.pa;
+    var pb = spring.pb;
+    var diff = subVecs(pb.pos, pa.pos, temp);
+    var length = l2norm(diff);
+    var normal = scalXvec(1/length, diff, temp2);
+    
+    if (!pb.fix) addVecs(pb.pos, scalXvec(-0.5*restitution*(length-spring.l), normal, temp1), pb.pos);
+    if (!pa.fix) addVecs(pa.pos, scalXvec(0.5*restitution*(length-spring.l), normal, temp1), pa.pos);
+}
+
 function computeBondStrain(spring) {
     var pa = spring.pa;
     var pb = spring.pb;
@@ -405,7 +416,7 @@ function integratePointVerlet(point, dt) {
    addVecs(subVecs(scalXvec(2, point.pos, temp1), point.ppos, temp2),
                    scalXvec(dt*dt/point.mass, point.force, temp3), next);
    
-   scalXvec(1/dt, subVecs(next, point.pos), point.v);
+   scalXvec(1/dt, subVecs(next, point.pos, temp1), point.v);
    
    var prev = point.ppos;
    point.ppos = point.pos;
@@ -451,7 +462,7 @@ function makeSimWorld(settings) {
         collisionIndex: true,
         collisionK: 30,
         gridStep: 1.1,
-        g: 1,
+        g: 0.2,
         surfaceK: 10,
         airDrag: 0.1,
         anisoFriction: false,
@@ -465,12 +476,16 @@ function makeSimWorld(settings) {
         gridWidth: 1,
         drawBonds: true,
         drawAtoms: true,
+        bondSolveIter: 3,
+        actuatorSolveIter: 30
     };
     
     util.simpleExtend(world, settings);
     
     world.points = [];
     world.springs = [];
+    world.actuators = [];
+    world.actPoints = [];
     world.pIdCounter = 0;
     world.connIndex = [];
     world.selection = {};
@@ -480,9 +495,11 @@ function makeSimWorld(settings) {
     
     world.addSoftBody = function(body) {
         var i;
+        var actuatedPoints = {};
         for (i=0; i<body.points.length; i++) {
             var point = body.points[i];
             point.id = this.pIdCounter++;
+            this.connIndex[point.id] = {};
         }
         for (i=0; i<body.springs.length; i++) {
             var spring = body.springs[i];
@@ -494,14 +511,26 @@ function makeSimWorld(settings) {
                 this.connIndex[spring.pb.id] = {};
             }
             this.connIndex[spring.pb.id][spring.pa.id] = true;
+            
+            //Discern actuator bonds and corresponding points from static bonds
+            if (spring.act) {
+                this.actuators.push(spring);
+                actuatedPoints[spring.pa.id] = true;
+                actuatedPoints[spring.pb.id] = true;
+            } else {
+                this.springs.push(spring);
+            }
         }
         
         for (i=0; i<body.points.length; i++) {
             var point = body.points[i];
             this.index3d.addObject(point.pos, point, this.connIndex);
+            if (actuatedPoints[point.id]) {
+                this.actPoints.push(point);            
+            } else {
+                this.points.push(point);
+            }
         }
-        util.pushBack(this.points, body.points);
-        util.pushBack(this.springs, body.springs);
     };
     
     world.floodFillSelection = function () {
@@ -637,13 +666,33 @@ function makeSimWorld(settings) {
         
         var bondSolver = this.springsHooke ? penaltyForceSolver : positionConstraintSolver;
         util.arrayShuffle(this.springs, pseudoRandom);
-        for (i=0; i<this.springs.length; i++) {
-            spr = this.springs[i];
-            bondSolver(spr, this);
+        for (j=0; j<this.bondSolveIter; j++) {
+            for (i=0; i<this.springs.length; i++) {
+                spr = this.springs[i];
+                bondSolver(spr, this);
+            }
         }
         
         for (i=0; i<this.points.length; i++) {
             pt = this.points[i];
+            if (!pt.fix) {
+                computePointForces(pt, this);
+                pointIntegrator(pt, dt);
+            }
+        }
+        
+        //Solve actuated bonds and points more accurately    
+        for (j=0; j<this.actuatorSolveIter; j++) {
+            util.arrayShuffle(this.actuators, pseudoRandom);
+            for (i=0; i<this.actuators.length; i++) {
+                spr = this.actuators[i];
+                positionConstraintSolverSmooth(spr, 0.5);
+            }
+        }
+        
+        util.arrayShuffle(this.actPoints, pseudoRandom);
+        for (i=0; i<this.actPoints.length; i++) {
+            pt = this.actPoints[i];
             if (!pt.fix) {
                 computePointForces(pt, this);
                 pointIntegrator(pt, dt);
@@ -735,19 +784,38 @@ function makeSimWorld(settings) {
             applyCameraTransform(camera, pt.pos, pt.scrPos);
         }
         
+        if (this.actPoints) {
+            for (i=0; i<this.actPoints.length; i++) {
+                pt = this.actPoints[i];
+                applyCameraTransform(camera, pt.pos, pt.scrPos);
+            }
+        }
+        
         if (this.drawAtoms) {            
             if (this.sortPointsByZ) { this.points.sort(comparePoints); }
-            for (i=0; i<this.points.length; i++) {
-                pt = this.points[i];
+            var that = this;
+            function drawPoint(pt) {
                 width = ptW;
                 fill = 1;
-                color = pt.color
+                color = pt.color;
                 if (pt.r) width = camera.screenScaling*pt.r;
-                if (this.selection[pt.id]) { 
+                if (that.selection[pt.id]) { 
                     fill = undefined;
                     color = "#AA1111";
                 }
                 screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, fill, color);
+            }
+            
+            for (i=0; i<this.points.length; i++) {
+                pt = this.points[i];
+                drawPoint(pt);
+            }
+            
+            if (this.actPoints) {
+                for (i=0; i<this.actPoints.length; i++) {
+                    pt = this.actPoints[i];
+                    drawPoint(pt);
+                }
             }
         }
         

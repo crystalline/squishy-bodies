@@ -2,7 +2,7 @@
 //Author: Crystalline Emerald (crystalline.emerald@gmail.com)
 
 //L is the number of rings, N is a number of sections per ring radialProfile is a function that returns radius of ring given its number, dist is distance between rings	   
-function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin) {
+function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin, muscleIndices) {
     
     var rings = [];
     var axialSprings = [];
@@ -11,6 +11,7 @@ function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin) {
     
     var points = [];
     var springs = [];
+    var muscles = {};
     
     for (i=0; i<L; i++) {
         var R = radialProfile(i/L);
@@ -26,7 +27,23 @@ function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin) {
     }
     
     for (i=0; i<L-1; i++) {
-        var linkRes = linkRings(rings[i], rings[i+1], dist, k);
+        
+        var linkRes;
+        if (muscleIndices && muscleIndices[i]) {
+            linkRes = linkRings(rings[i], rings[i+1], dist, k);
+        } else {
+            linkRes = linkRings(rings[i], rings[i+1], dist, k);
+        }
+
+        if (muscleIndices && muscleIndices[i]) {
+            for (j=0; j<linkRes.muscles.length; j++) {
+                linkRes.muscles[j].spr.act = true;
+                linkRes.muscles[j].spA.act = true;
+                linkRes.muscles[j].spB.act = true;
+            }
+            muscles[i] = linkRes.muscles;
+        }
+        
         axialSprings = axialSprings.concat(linkRes.springs);
         
         for (j=0; j<N; j++) {
@@ -37,8 +54,12 @@ function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin) {
     
     springs = springs.concat(axialSprings);
     
-    var body = {points: points, springs: springs, rings: rings, lines: lines};
-    
+    var body = {points: points,
+                springs: springs,
+                rings: rings,
+                lines: lines,
+                muscles: muscles};
+        
     return body;
 }
 
@@ -47,7 +68,7 @@ function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin) {
 function makeLeg(config) {
     var shape = config.shape;
     if (typeof config.shape == 'number') { shape = function (x) { return config.shape; }; }
-    var leg = makeRadialProfile(config.nsegments, config.nlines, config.seglen, config.stiffness, config.pmass, shape, config.fixorigin);
+    var leg = makeRadialProfile(config.nsegments, config.nlines, config.seglen, config.stiffness, config.pmass, shape, config.fixorigin, config.muscle);
     var dir = normalize(config.dir);
     var legAxis = [0,0,1];
     var rotAxis = normalize(crossVecs(legAxis, dir));
@@ -125,7 +146,37 @@ function makeFallingStrutsWorld() {
     
     world.addSoftBody(makeSoftBody(leg3.points, leg3.springs));
     
-    return world;
+    return {world:world};
+}
+
+function makeClawWorld() {
+    var world = makeSimWorld(worldSettings);
+    
+    var leg = makeLeg({origin: [0,0,0],
+                        dir: [0,0,1],
+                        nsegments: 16,
+                        seglen: 1.1,
+                        nlines: 6,
+                        stiffness: 30,
+                        pmass: 0.2,
+                        pradius: 0.5,
+                        shape: 1.3,
+                        fixorigin: true,
+                        muscle: {1:true, 2:true, 3:true, 8:true, 9:true, 10:true}});
+    
+    world.addSoftBody(makeSoftBody(leg.points, leg.springs));
+    
+    return {world:world, body:leg};
+}
+
+function makeTrussWorld() {
+    var world = makeSimWorld(worldSettings);
+    
+    var truss = makeTetraTruss(0, [0,0,1], 1.1, 10, 0.1);
+    
+    world.addSoftBody(makeSoftBody(truss.points, truss.springs));
+    
+    return {world:world, body:truss};
 }
 
 function makeMomentumConservationTestWorld() {
@@ -152,7 +203,7 @@ function makeMomentumConservationTestWorld() {
     
     world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
     world.addSoftBody(makeSoftBody(leg2.points, leg2.springs));
-    return world;
+    return {world:world};
 }
 
 function makeRigidityTestWorld() {
@@ -169,7 +220,7 @@ function makeRigidityTestWorld() {
                         shape: function(x) { return x < 0.5 ? 1.0+(0.5-x) : 1.0 },
                         fixorigin: true});
     world.addSoftBody(makeSoftBody(leg1.points, leg1.springs));
-    return world;
+    return {world:world};
 }
 
 var worldSettings = {
@@ -192,13 +243,72 @@ function runQuadDemo() {
 
     window.s = simulation;
     
-    simulation.world = makeFallingStrutsWorld();
+    var model = makeTrussWorld();
+    
+    simulation.world = model.world;//makeFallingStrutsWorld();
+    console.log(model.body);
     simulation.world.cc = 0;
     
     simulation.simDt = 0.03;
-    simulation.setup = function(world, camera, gui, simConfig) {
+    
+    var muscles = {};
+    
+    var sq2 = Math.sqrt(2);
+    var restL = 1.1;
+    var minL = 0.7*restL;
+    var maxL = 1.3*restL;
+    
+    function linMap(x, a, b) {
+        return a + Math.min(1,Math.max(0,x))*(b-a);
+    }
+    
+    function controlClaw (world, camera, gui, simConfig) {
+        actuators1 = model.body.muscles[8];
+        actuators2 = model.body.muscles[9];
+        actuators3 = model.body.muscles[10];
         
+        console.log(model.body.muscles);
+        
+        var i;
+        var N = Math.floor(actuators1.length/2);
+        
+        function actuate(actuators,i,x) {
+            actuators[i].spr.l = linMap(x, minL, maxL);
+            actuators[i].spA.l = sq2*linMap(x, minL, maxL);
+            actuators[i].spB.l = sq2*linMap(x, minL, maxL);
+            actuators[i+N].spr.l = linMap(1-x, minL, maxL);
+            actuators[i+N].spA.l = sq2*linMap(1-x, minL, maxL);
+            actuators[i+N].spB.l = sq2*linMap(1-x, minL, maxL);
+        }
+        
+        var attachHandler = function (pre, i, actuators) {
+            muscles[pre+i] = 0.5;
+            gui.add(muscles, pre+i, 0, 1).onChange(function (x) {
+                var k;
+                for (k=0; k<actuators.length; k++) {
+                    actuate(actuators[k], i, x);                
+                }
+                gui.updateManually();
+            });        
+        };
+        
+        var joint1 = [model.body.muscles[8],model.body.muscles[9],model.body.muscles[10]];
+        var joint2 = [model.body.muscles[1],model.body.muscles[2],model.body.muscles[3]];
+        
+        for (i=0; i<N; i++) {
+            attachHandler("top", i, joint1);
+        }
+        
+        for (i=0; i<N; i++) {
+            attachHandler("bot", i, joint2);
+        }
     };
+    
+    function controlTruss(world, camera, gui, simConfig) {
+    
+    };
+    
+    simulation.setup = controlTruss;
     
     function hashSim(world, step) {
         console.log("Sim timestep="+step+" hash="+util.stringHash(JSON.stringify(world.points.map(function(p) { return p.pos })))+" cc="+world.cc);

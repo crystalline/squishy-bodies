@@ -446,7 +446,7 @@ function runSimulationInViewer(simConfig) {
         if (!config.pauseRender) graphics.drawText(stats, 10, 10);
         
         prevFrameT = time;
-        timestep++;
+        if (!config.pauseSim) timestep++;
         frameCount++;
     }
     
