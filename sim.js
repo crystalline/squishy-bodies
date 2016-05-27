@@ -1,5 +1,6 @@
-//Soft body simulator with anisotropic friction
-//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
+// Soft body simulator with anisotropic friction
+// Copyright (c) 2016 Crystalline Emerald
+// Licensed under MIT license.
 
 //3d index class
 //TODO: optimize xsize and ysize to be power of 2

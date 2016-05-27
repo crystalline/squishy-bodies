@@ -1,5 +1,7 @@
-//C-elegans-like worm model constructor
-//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
+// Squishy bodies - a soft body physics simulation engine for Javascript
+// "C Elegans" demo - C-elegans-like physically actuated worm model. Sets some flags to modify sim's physics computation, notably anisotropic friction
+// Copyright (c) 2016 Crystalline Emerald
+// Licensed under MIT license.
 
 //L is the number of rings, N is a number of sections per ring R is radius of ring, dist is distance between rings	   
 function makeWormModel(L, N, dist, k, mass, radialProfile, pradius) {
@@ -108,7 +110,7 @@ var worldSettings = {
     surfaceK: 5.0,
     surfaceDrag: 0.28,
     anisoFriction: true,
-    surfaceDragTan: 0.28,
+    surfaceDragTan: 0.4,
     surfaceDragNorm: 0.01,
     airDrag: 0.01,
     g: 1.0,
@@ -130,9 +132,9 @@ var Rend = 1.0;
 var wormSections = 31;
 var wormLines = 6;
 var wormSectionSpacing = 1.2;
-var wormStiffness = 30;
+var wormStiffness = 20;
 var wormPointMass = 0.1;
-var wormBallRadius = 0.5;
+var wormBallRadius = 0.3;
 
 var contractionLimit = 0.5*wormSectionSpacing;
 
@@ -143,7 +145,7 @@ function runWormDemo() {
     simulation.world = makeSimWorld(worldSettings);
     simulation.worm = makeWormModel(wormSections, wormLines, wormSectionSpacing, wormStiffness, wormPointMass, wormProfile, wormBallRadius);
     simulation.world.addSoftBody(makeSoftBody(simulation.worm.points, simulation.worm.springs));
-    simulation.simDt = 0.03;
+    simulation.simDt = 0.01;
     simulation.controller = function(world, dt, nStep, simConfig) {
         wormControllerStep(simConfig.worm, dt, nStep);
     };

@@ -1,5 +1,6 @@
-//JS utility functions
-//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
+// Soft body simulator with anisotropic friction
+// Copyright (c) 2016 Crystalline Emerald
+// Licensed under MIT license.
 
 util = {
     isNumeric: function(n) {

@@ -1,5 +1,7 @@
-//Common 3d subroutines ported to JS from CL
-//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
+// Common 3d subroutines for Javascript
+// Copyright (c) 2016 Crystalline Emerald
+// Licensed under MIT license.
+
 //Initial slow implementation
 //TODO: Speed up
 //TODO: lower allocation overhead

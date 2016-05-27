@@ -1,5 +1,8 @@
-//Generic HTML5 viewer for running squishy-body simulations. Provides camera and default controls, allows for customization via callbacks. See the main function runSimulationInViewer for details.
-//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
+// Generic HTML5 viewer for running simulations with squishy-body physics engine.
+// Provides camera and default controls, allows for customization via callbacks.
+// See the main function runSimulationInViewer for details.
+// Copyright (c) 2016 Crystalline Emerald
+// Licensed under MIT license.
 
 function makeAnimationController(settings) {
     var ac = {animations:[], freeList:[]};

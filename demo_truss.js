@@ -1,5 +1,7 @@
-//Quadruped creature constructor
-//Author: Crystalline Emerald (crystalline.emerald@gmail.com)
+// Squishy bodies - a soft body physics simulation engine for Javascript
+// "Truss" demo - work in progress
+// Copyright (c) 2016 Crystalline Emerald
+// Licensed under MIT license.
 
 //L is the number of rings, N is a number of sections per ring radialProfile is a function that returns radius of ring given its number, dist is distance between rings	   
 function makeRadialProfile(L, N, dist, k, mass, radialProfile, fixOrigin, muscleIndices) {
@@ -243,9 +245,11 @@ function runQuadDemo() {
 
     window.s = simulation;
     
+    //var model = makeFallingStrutsWorld();
     var model = makeTrussWorld();
+    //var model = makeClawWorld();
     
-    simulation.world = model.world;//makeFallingStrutsWorld();
+    simulation.world = model.world;
     console.log(model.body);
     simulation.world.cc = 0;
     
