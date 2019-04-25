@@ -3,6 +3,16 @@
 Squishy bodies is a softbody simulation engine written in Javascript. There are no other dependencies except HTML5-conforming browser. Squishy bodies uses canvas for rendering of simulation scenes.
 Special features include anisotropic friction that allows for realistic snake/worm locomotion simulation.
 
+## Demos
+
+![trusses demo](https://github.com/crystalline/squishy-bodies/raw/master/docs/scr_truss.png "Trusses demo")
+[Falling struts](https://crystalline.github.io/squishy-bodies/demo_falling_struts.html)<br/>
+A simple demo of soft strut instances falling down and colliding with each other
+
+![worm demo](https://github.com/crystalline/squishy-bodies/raw/master/docs/scr_worm.png "Worm demo")
+[Nematode-like worm](https://crystalline.github.io/squishy-bodies/demo_worm.html)<br/>
+A more sophisticated demo is a simulation of C Elegans-like worm built from masses and springs. Long lines of muscles cells are simulated with springs that have their equilibrium lengths modulated in a sinusoidal pattern by hardcoded controller.
+
 ## Code Example
 
 You can create worlds filled with various contraptions built from point masses linked with springs and then simulate them by calling world.step(dt). Make sure that your springs aren't too stiff and timestep isn't too large or the simulation may explode.
@@ -15,11 +25,6 @@ var world = makeSimWorld();
 world.addSoftBody(softbody);
 world.step(0.01);
 ```
-
-## Demo
-
-The only demo so far is a simulation of C Elegans-like worm built from masses and springs. Long lines of muscles cells are simulated with springs that have their equilibrium lengths modulated in a sinusoidal pattern by hardcoded controller.
-To run it just load ./wormdemo.html in your browser.
 
 ## Contributors
 
