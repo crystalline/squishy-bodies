@@ -81,6 +81,18 @@ function makeGraphics() {
         graphics.clear();
     };
     
+    graphics.drawCircleGradient = function (x,y,r, colA, colB) {
+      var gradient = this.ctx.createRadialGradient(x, y, r*0.3, x, y, r);
+      gradient.addColorStop(0, colA);
+      gradient.addColorStop(1, colB);
+      var ctx = this.ctx;
+      ctx.beginPath();
+      ctx.arc(Math.round(x), Math.round(y), Math.round(r), 0, 2 * Math.PI, false);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.closePath();
+    };
+    
     graphics.drawCircle = function(x, y, r, stroke, col) {
         var oldCol;
         if (col) { oldCol = this.ctx.fillStyle; this.ctx.fillStyle = col; }
@@ -91,6 +103,7 @@ function makeGraphics() {
         if (!stroke) ctx.fill();
         else ctx.stroke();
         if (oldCol) { this.ctx.fillStyle = oldCol; }
+        ctx.closePath();
     };
     
     graphics.drawRect = function(x, y, w, h, col) {
@@ -200,6 +213,9 @@ function runSimulationInViewer(simConfig) {
     gui.add(config, "pauseRender");
     gui.add(world, "drawAtoms");
     gui.add(world, "drawBonds");
+    gui.add(world, "sortPointsByZ");
+    gui.add(world, "drawAtomsGradient");
+    gui.add(world, "drawColliding");
     gui.add(config, "pauseSim");
     gui.add(simConfig, "simDt");
     if (simConfig.controller) gui.add(config, "controller");
@@ -356,7 +372,6 @@ function runSimulationInViewer(simConfig) {
     
     //Keyboard event handling
     function getChar(event) {
-        console.log(event.keyCode);
         if (specialCodes[event.keyCode]) return specialCodes[event.keyCode];
         if (event.which != 0) {
             if (event.which < 32) return null;
@@ -383,18 +398,30 @@ function runSimulationInViewer(simConfig) {
     window.addEventListener("keydown", function(event) {
         handleEvent(event);
         var char = getChar(event);
-        if (char == "+") { scaleCam(scalConst); return }
-        if (char == "-") { scaleCam(-scalConst); return }   
-        if (char == "[") { editor.selRadius = Math.max(1.0, editor.selRadius-1.0); };
-        if (char == "]") { editor.selRadius = editor.selRadius+1.0; };
-        if (char == "left") { rotCam(rotConst, 0); return }
-        if (char == "right") { rotCam(-rotConst, 0); return }
-        if (char == "up") { rotCam(0, rotConst); return }
-        if (char == "down") { rotCam(0, -rotConst); return }
-        if (char == "escape") { world.selection = {} }
-        if (char == "delete") { world.deletePointByIds(world.selection); world.selection = {}; }
-        if (char == "F") { world.floodFillSelection() };
-        if (char == "M") { world.minimizeSelection() };
+        if (char === "+") { scaleCam(scalConst); return }
+        if (char === "-") { scaleCam(-scalConst); return }   
+        if (char === "[") { editor.selRadius = Math.max(1.0, editor.selRadius-1.0); };
+        if (char === "]") { editor.selRadius = editor.selRadius+1.0; };
+        if (char === "left") { rotCam(rotConst, 0); return }
+        if (char === "right") { rotCam(-rotConst, 0); return }
+        if (char === "up") { rotCam(0, rotConst); return }
+        if (char === "down") { rotCam(0, -rotConst); return }
+        if (char === "escape") { world.selection = {} }
+        if (char === "delete") { world.deletePointByIds(world.selection); world.selection = {}; }
+        if (char === "F") { world.floodFillSelection() };
+        if (char === "M") { world.minimizeSelection() };
+        if (char === "1") {
+          world.drawAtoms = true;
+          world.drawAtomsGradient = true;
+          world.sortPointsByZ = true;
+          world.drawColliding = true;
+        }
+        if (char === "2") {
+          world.drawAtoms = true;
+          world.drawAtomsGradient = false;
+          world.sortPointsByZ = false;
+          world.drawColliding = true;
+        }
         
         var vec = movekeys[char];
         if (vec && !camera.posUpdate) {
@@ -405,13 +432,12 @@ function runSimulationInViewer(simConfig) {
             cam.x += delta[0];
             cam.y += delta[1];
             cam.z += 0;
-            gui.updateManually();
             camUpdate();
         };
         if (char == " ") {
             config.pauseSim = !config.pauseSim;
-            gui.updateManually();
         }
+        gui.updateManually();
     });
     window.addEventListener("keyup", function(event) {
         handleEvent(event);

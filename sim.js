@@ -306,7 +306,6 @@ function makeSoftBody(points, springs) {
     points.forEach(function (point) {
         point.v = makeVec3(0,0,0);
         point.force = makeVec3(0,0,0);
-        point.ground = false;
         point.scrPos = makeVec3(0,0,0);
         point.ppos = makeVec3(point.pos[0], point.pos[1], point.pos[2]);
     });
@@ -385,9 +384,7 @@ function computePointForces(point, world) {
     var z = point.pos[2];
     var anisoFriction = world.anisoFriction;
     
-    if (z < 0) {
-        point.ground = true;
-        
+    if (z < 0) {        
         //point.force[2] -= world.surfaceK * z;
         point.pos[2] = 0;
                 
@@ -397,7 +394,6 @@ function computePointForces(point, world) {
             computeSimpleFriction(point, world);
         }
     } else {
-        point.ground = false;
         //Add air drag force
         addVecs(point.force, scalXvec(-world.airDrag, point.v, temp), point.force);
     }
@@ -462,6 +458,7 @@ function makeSimWorld(settings) {
         collisions: true,
         collisionIndex: true,
         collisionK: 30,
+        collidingIds: {},
         gridStep: 1.1,
         g: 0.2,
         surfaceK: 10,
@@ -477,6 +474,8 @@ function makeSimWorld(settings) {
         gridWidth: 1,
         drawBonds: true,
         drawAtoms: true,
+        drawAtomsGradient: false,
+        drawColliding: false,
         bondSolveIter: 3,
         actuatorSolveIter: 30
     };
@@ -493,6 +492,26 @@ function makeSimWorld(settings) {
     
     world.index3d = new make3dIndex(1.01,1024,1024);
     world.objById = world.index3d.objectCache;
+    
+    world.computeCollisionTracked = function(pa, pb) {
+      var ret = computeCollision(pa,pb);
+      if (world.drawColliding) {
+        if (ret) {
+          world.collidingIds[pa.id] = true;
+          world.collidingIds[pb.id] = true;
+        } else {
+          world.collidingIds[pa.id] = false;
+          world.collidingIds[pb.id] = false;
+        }
+        if ((pa.pos[2]-1e-06) < 0.0) {
+          world.collidingIds[pa.id] = true;
+        }
+        if ((pb.pos[2]-1e-06) < 0.0) {
+          world.collidingIds[pb.id] = true;
+        }
+      }
+      return ret;
+    }
     
     world.addSoftBody = function(body) {
         var i;
@@ -633,6 +652,8 @@ function makeSimWorld(settings) {
         var pointIntegrator = this.integrator;
         var that = this;
         
+        var _computeCollision = this.drawColliding ? this.computeCollisionTracked : computeCollision;
+        
         if (this.collisions) {
             util.arrayShuffle(this.points, pseudoRandom);
             var collStartIndexT = Date.now();
@@ -648,14 +669,16 @@ function makeSimWorld(settings) {
             if (this.collisionIndex) {
                 for (i=0; i<this.points.length; i++) {
                     pa = this.points[i];
-                    this.index3d.updateObjectsInRadiusAroundObject(pa, computeCollision, this.connIndex);
+                    this.index3d.updateObjectsInRadiusAroundObject(pa, _computeCollision, this.connIndex);
                 }
             } else {
                 for (i=0; i<this.points.length; i++) {
                     pa = this.points[i];
                     for (j=0; j<this.points.length; j++) {
                         pb = this.points[j];
-                        if (!this.checkBond(pa,pb)) computeCollision(pa, pb);
+                        if (!this.checkBond(pa,pb)) {
+                          var ret = _computeCollision(pa, pb);
+                        }
                     }
                 }
             }            
@@ -792,6 +815,8 @@ function makeSimWorld(settings) {
             }
         }
         
+        drawGrid(camera, screen, 10, 10, gridW);
+        
         if (this.drawAtoms) {            
             if (this.sortPointsByZ) { this.points.sort(comparePoints); }
             var that = this;
@@ -799,6 +824,7 @@ function makeSimWorld(settings) {
                 width = ptW;
                 fill = 1;
                 color = pt.color;
+                var displayColor = '#0000FF';
                 if (pt.r) width = camera.screenScaling*pt.r;
                 if (that.selection[pt.id]) {
                     fill = undefined;
@@ -807,7 +833,16 @@ function makeSimWorld(settings) {
                       color = "#FFFF00";
                     }
                 }
-                screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, fill, color);
+                if (that.drawColliding && that.collidingIds[pt.id]) {
+                  displayColor = '#00FF00';
+                  color = '#00FF00';
+                  fill = undefined;
+                }
+                if (that.drawAtomsGradient) {
+                  screen.drawCircleGradient(pt.scrPos[0], pt.scrPos[1], width, '#FFFFFF', displayColor);  
+                } else {
+                  screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, fill, color);  
+                }
             }
             
             for (i=0; i<this.points.length; i++) {
@@ -832,7 +867,6 @@ function makeSimWorld(settings) {
             }
         }
         
-        drawGrid(camera, screen, 10, 10, gridW);
         drawReference(camera, screen);
     };
     

@@ -129,8 +129,11 @@ var worldSettings = {
     surfaceDragNorm: 0.01,
     airDrag: 0.2,
     g: 1.0,
+    drawAtoms: true,
     drawBonds: false,
-    sortPointsByZ: 0
+    drawAtomsGradient: true,
+    sortPointsByZ: true,
+    drawColliding: true
 }
 
 function runQuadDemo() {
