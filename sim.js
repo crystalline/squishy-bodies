@@ -829,8 +829,10 @@ function makeSimWorld(settings) {
                 if (that.selection[pt.id]) {
                     fill = undefined;
                     color = "#AA1111";
+                    displayColor = '#AA1111';
                     if (that.selectionIsMoving) {
                       color = "#FFFF00";
+                      displayColor = '#FFFF00';
                     }
                 }
                 if (that.drawColliding && that.collidingIds[pt.id]) {
