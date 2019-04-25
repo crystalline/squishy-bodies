@@ -17,6 +17,8 @@ Shift+MouseMove to move selected atoms
 F to floodfill the selection to the connected atom graphs
 Space to pause simulation
 [ and ] to scale selection radius
+1 to enable slow shaded z-ordered rendering
+2 to enable fast wireframe unordered rendering
 ```
 
 ![trusses demo](https://github.com/crystalline/squishy-bodies/raw/master/docs/scr_truss.png "Trusses demo")
