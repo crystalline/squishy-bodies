@@ -417,6 +417,14 @@ function makeCamera(position, alpha, beta, screenW, screenH, scale) {
         return res;
     };
     
+    camera.getWorldXYFromScreenXY = function(screenX, screenY) {
+        var size = Math.min(this.screenW, this.screenH);
+        var nX = (screenX-0.5*this.screenW)
+        var nY = ((this.screenH-screenY)-0.5*this.screenH)
+        var scrSource = addArrOfVecs([ scalXvec(nX, this.right), scalXvec(nY, this.top)]);
+        return {x: nX, y: nY};
+    };
+    
     camera.updateTransform(alpha, beta, screenW, screenH, scale);
     
     return camera;

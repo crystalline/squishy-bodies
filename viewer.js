@@ -211,7 +211,7 @@ function runSimulationInViewer(simConfig) {
     gui.add(cam, "z").onChange(camUpdate);
     gui.add(editor, "selRadius", 0.0, 10.0);
     gui.add(editor, "instantMove");
-    editor.selRadius = 0;
+    editor.selRadius = 1.0;
     
     gui.updateManually = function() {
         var gui = this;
@@ -241,14 +241,25 @@ function runSimulationInViewer(simConfig) {
     var mouseDown = 0;
     var px=false;
     var py=false;
+    var mouseWorldX = false;
+    var mouseWorldY = false;
     var mouseWorldMove = false;
     
     //Keyboard modifiers
     var mods = {};
     
     function handleEvent(event) {
-        mods.ctrl = event.ctrlKey;
-        mods.shift = event.shiftKey;
+        if (event.type === 'keyup') {
+          if (event.key === 'Control') {
+            mods.ctrl = false;  
+          }
+          if (event.key === 'Shift') {
+            mods.shift = false;  
+          }
+        } else {
+          mods.ctrl = event.ctrlKey || (event.key === 'Control');
+          mods.shift = event.shiftKey || (event.key === 'Shift');
+        }
     }
     
     window.addEventListener("resize", function() {
@@ -262,8 +273,14 @@ function runSimulationInViewer(simConfig) {
         handleEvent(event);
         var x = event.pageX;
         var y = event.pageY;
+        
+        var _mxy = camera.getWorldXYFromScreenXY(x, y);
+        mouseWorldX = _mxy.x;
+        mouseWorldY = _mxy.y;
+        
         //Move atoms
         if (mods.shift && mouseDown && px && py) {
+            world.selectionIsMoving = true;
             var ray = camera.getRayFromScreen(x,y);
             if (!mouseWorldMove) {
                 mouseWorldMove = ray.scrSource;
@@ -300,6 +317,7 @@ function runSimulationInViewer(simConfig) {
                 mouseWorldMove = ray.scrSource;
             }
         } else {
+            world.selectionIsMoving = false;
             //Rotate camera
             if (!mods.ctrl && mouseDown && px && py) {
                 rotCam((x - px), (y - py));
@@ -322,10 +340,12 @@ function runSimulationInViewer(simConfig) {
     }
     
     var specialCodes = {
-        109: "-",
+        173: "-",
         189: "-",
-        107: "+",
+        61: "+",
         187: "+",
+        219: "[",
+        221: "]",
         37: "left",
         38: "up",
         39: "right",
@@ -336,9 +356,7 @@ function runSimulationInViewer(simConfig) {
     
     //Keyboard event handling
     function getChar(event) {
-        mods.ctrl = event.controlKey;
-        mods.shift = event.shiftKey;
-        //console.log(event.keyCode);
+        console.log(event.keyCode);
         if (specialCodes[event.keyCode]) return specialCodes[event.keyCode];
         if (event.which != 0) {
             if (event.which < 32) return null;
@@ -357,13 +375,18 @@ function runSimulationInViewer(simConfig) {
     
     var rotConst = rad2ang(0.1);
     var scalConst = 0.1;
+
+    window.addEventListener("keyup", function(event) {
+        handleEvent(event);
+    });
     
     window.addEventListener("keydown", function(event) {
         handleEvent(event);
         var char = getChar(event);
-        
         if (char == "+") { scaleCam(scalConst); return }
         if (char == "-") { scaleCam(-scalConst); return }   
+        if (char == "[") { editor.selRadius = Math.max(1.0, editor.selRadius-1.0); };
+        if (char == "]") { editor.selRadius = editor.selRadius+1.0; };
         if (char == "left") { rotCam(rotConst, 0); return }
         if (char == "right") { rotCam(-rotConst, 0); return }
         if (char == "up") { rotCam(0, rotConst); return }
@@ -430,6 +453,12 @@ function runSimulationInViewer(simConfig) {
         if (!config.pauseRender) { 
             graphics.clear();
             world.draw(camera, graphics);
+        }
+                
+        if (mods.ctrl) {
+          graphics.drawCircle(mouseWorldX, mouseWorldY, editor.selRadius*camera.screenScaling, false, 'rgba(255,0,0,0.45)');
+        } else {
+          graphics.drawCircle(mouseWorldX, mouseWorldY, editor.selRadius*camera.screenScaling, false, 'rgba(0,0,0,0.3)');
         }
         
         var time = Date.now();

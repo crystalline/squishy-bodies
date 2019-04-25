@@ -800,9 +800,12 @@ function makeSimWorld(settings) {
                 fill = 1;
                 color = pt.color;
                 if (pt.r) width = camera.screenScaling*pt.r;
-                if (that.selection[pt.id]) { 
+                if (that.selection[pt.id]) {
                     fill = undefined;
                     color = "#AA1111";
+                    if (that.selectionIsMoving) {
+                      color = "#FFFF00";
+                    }
                 }
                 screen.drawCircle(pt.scrPos[0], pt.scrPos[1], width, fill, color);
             }
