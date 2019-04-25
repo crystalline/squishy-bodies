@@ -5,6 +5,18 @@ Special features include anisotropic friction that allows for realistic snake/wo
 
 ## Demos
 
+### Controls
+```
+W,A,S,D to move camera
+LeftMouseClick+MouseMove or arrow keys to rotate camera
++/- to scale camera
+Ctrl+LeftMouseClick to select atoms
+Shift+MouseMove to move selected atoms
+F to floodfill the selection to the connected atom graphs
+Space to pause simulation
+[ and ] to scale selection radius
+```
+
 ![trusses demo](https://github.com/crystalline/squishy-bodies/raw/master/docs/scr_truss.png "Trusses demo")
 [Falling struts](https://crystalline.github.io/squishy-bodies/demo_falling_struts.html)<br/>
 A simple demo of soft strut instances falling down and colliding with each other
